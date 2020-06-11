@@ -5,7 +5,7 @@
             "type": "shell",
             "label": "g++ build active file",
             "command": "/usr/bin/g++",
-            "args": ["-g", "${file}", "-o", "${fileDirname}\\${fileBasenameNoExtension}.exe"],
+            "args": ["-g", "${file}", "-o", "${fileDirname}/${fileBasenameNoExtension}.exe"],
             "options": {
                 "cwd": "/usr/bin"
             },
@@ -19,7 +19,7 @@
             "type": "shell",
             "label": "g++ build active openmp",
             "command": "/usr/bin/g++",
-            "args": ["-fopenmp", "-g", "${file}", "-o", "${fileDirname}\\${fileBasenameNoExtension}.exe"],
+            "args": ["-fopenmp", "-g", "${file}", "-o", "${fileDirname}/${fileBasenameNoExtension}.exe"],
             "options": {
                 "cwd": "/usr/bin"
             },
