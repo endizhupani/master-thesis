@@ -18,6 +18,21 @@
 
         {
             "type": "shell",
+            "label": "mpi build active file",
+            "command": "mpicxx",
+            "args": ["-g", "${file}", "-o", "${fileDirname}/${fileBasenameNoExtension}.exe"],
+            "options": {
+                "cwd": "/usr/bin"
+            },
+            "problemMatcher": ["$gcc"],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+
+        {
+            "type": "shell",
             "label": "make active file",
             "command": "make",
             "args": [],
