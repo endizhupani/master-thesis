@@ -22,8 +22,8 @@ int main()
 
     strncat(sd1, " - ", maxbuf - strlen(sd1) - 1);
     strncat(sd1, s2, maxbuf - strlen(sd1) - 1);
-
     printf("sd1 is %s\n", sd1);
 
+    
     return 0;
 }

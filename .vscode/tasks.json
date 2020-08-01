@@ -15,6 +15,20 @@
                 "isDefault": true
             }
         },
+
+        {
+            "type": "shell",
+            "label": "make active file",
+            "command": "make",
+            "args": [],
+            "options": {
+                "cwd": "${fileDirname}/"
+            },
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
         {
             "type": "shell",
             "label": "g++ build active openmp",
