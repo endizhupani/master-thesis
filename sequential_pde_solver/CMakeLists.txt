@@ -1,6 +1,14 @@
 cmake_minimum_required(VERSION 3.16)
-project(sequential_pde_solver)
+set(project_name sequential_pde_solver)
+project(${project_name})
 
 set(CMAKE_CXX_STANDARD 14)
+find_package(OpenMP REQUIRED)
 
-add_executable(sequential_pde_solver main.cpp)
+set(executable main.cpp)
+
+set(executable_name ${project_name})
+
+### get name of current example
+add_executable(${executable_name} ${executable})
+target_link_libraries(${executable_name} PUBLIC ${OpenMP_CXX_LIBRARIES})

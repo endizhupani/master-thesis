@@ -79,6 +79,8 @@ sequential_pde_solver_EXTERNAL_OBJECTS =
 
 sequential_pde_solver: CMakeFiles/sequential_pde_solver.dir/main.cpp.o
 sequential_pde_solver: CMakeFiles/sequential_pde_solver.dir/build.make
+sequential_pde_solver: /usr/lib/gcc/x86_64-linux-gnu/9/libgomp.so
+sequential_pde_solver: /usr/lib/x86_64-linux-gnu/libpthread.so
 sequential_pde_solver: CMakeFiles/sequential_pde_solver.dir/link.txt
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --bold --progress-dir=/home/endizhupani/master_thesis/code/master-thesis/sequential_pde_solver/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Linking CXX executable sequential_pde_solver"
 	$(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/sequential_pde_solver.dir/link.txt --verbose=$(VERBOSE)

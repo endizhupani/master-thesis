@@ -1,4 +1,7 @@
 /usr/bin/cmake -DCMAKE_BUILD_TYPE=Debug -G "CodeBlocks - Unix Makefiles" /home/endizhupani/master_thesis/code/master-thesis/sequential_pde_solver
+-- Found OpenMP_C: -fopenmp (found version "4.5") 
+-- Found OpenMP_CXX: -fopenmp (found version "4.5") 
+-- Found OpenMP: TRUE (found version "4.5")  
 -- Configuring done
 -- Generating done
 -- Build files have been written to: /home/endizhupani/master_thesis/code/master-thesis/sequential_pde_solver/cmake-build-debug

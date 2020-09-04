@@ -9,4 +9,6 @@
 /home/endizhupani/master_thesis/code/master-thesis/sequential_pde_solver/main.cpp
 iostream
 -
+math.h
+-
 
