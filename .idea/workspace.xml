@@ -1,0 +1,196 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="BranchesTreeState">
+    <expand>
+      <path>
+        <item name="ROOT" type="e8cecc67:BranchNodeDescriptor" />
+        <item name="LOCAL_ROOT" type="e8cecc67:BranchNodeDescriptor" />
+      </path>
+      <path>
+        <item name="ROOT" type="e8cecc67:BranchNodeDescriptor" />
+        <item name="LOCAL_ROOT" type="e8cecc67:BranchNodeDescriptor" />
+        <item name="GROUP_NODE:feature" type="e8cecc67:BranchNodeDescriptor" />
+      </path>
+      <path>
+        <item name="ROOT" type="e8cecc67:BranchNodeDescriptor" />
+        <item name="REMOTE_ROOT" type="e8cecc67:BranchNodeDescriptor" />
+      </path>
+      <path>
+        <item name="ROOT" type="e8cecc67:BranchNodeDescriptor" />
+        <item name="REMOTE_ROOT" type="e8cecc67:BranchNodeDescriptor" />
+        <item name="GROUP_NODE:origin" type="e8cecc67:BranchNodeDescriptor" />
+      </path>
+    </expand>
+    <select />
+  </component>
+  <component name="CMakeRunConfigurationManager" shouldGenerate="true" shouldDeleteObsolete="true">
+    <generated>
+      <config projectName="sequential_pde_solver" targetName="sequential_pde_solver" />
+    </generated>
+  </component>
+  <component name="CMakeSettings" AUTO_RELOAD="true">
+    <configurations>
+      <configuration PROFILE_NAME="Debug-WSL" CONFIG_NAME="Debug" TOOLCHAIN_NAME="WSL" />
+      <configuration PROFILE_NAME="Debug" CONFIG_NAME="Debug" />
+      <configuration PROFILE_NAME="WSL_Profile" CONFIG_NAME="Release" />
+    </configurations>
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="92ac5742-cd33-4ae4-93a5-0efa1f4825cd" name="Default Changelist" comment="initial branch commit">
+      <change afterPath="$PROJECT_DIR$/open_mp_tests/CMakeLists.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/sequential_pde_solver/CMakeLists.txt" beforeDir="false" afterPath="$PROJECT_DIR$/sequential_pde_solver/CMakeLists.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/sequential_pde_solver/main.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/sequential_pde_solver/main.cpp" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="ClangdSettings">
+    <option name="formatViaClangd" value="false" />
+  </component>
+  <component name="ExecutionTargetManager" SELECTED_TARGET="CMakeBuildProfile:Debug-WSL" />
+  <component name="FileTemplateManagerImpl">
+    <option name="RECENT_TEMPLATES">
+      <list>
+        <option value="CMakeLists.txt" />
+      </list>
+    </option>
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="ProjectId" id="1gMk4pQsPfcZ0idtTt57jEXBbXN" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent">
+    <property name="RunOnceActivity.OpenProjectViewOnStart" value="true" />
+    <property name="WebServerToolWindowFactoryState" value="true" />
+    <property name="cf.first.check.clang-format" value="false" />
+    <property name="last_opened_file_path" value="$PROJECT_DIR$/sequential_pde_solver" />
+    <property name="settings.editor.selected.configurable" value="CMakeSettings" />
+  </component>
+  <component name="RunManager">
+    <configuration default="true" type="CLion_Remote" toolchainName="WSL" remoteCommand="" symbolFile="" sysroot="">
+      <method v="2" />
+    </configuration>
+    <configuration default="true" type="CMakeRunConfiguration" factoryName="Application" REDIRECT_INPUT="false" PASS_PARENT_ENVS_2="true">
+      <method v="2">
+        <option name="com.jetbrains.cidr.execution.CidrBuildBeforeRunTaskProvider$BuildBeforeRunTask" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="sequential_pde_solver" type="CMakeRunConfiguration" factoryName="Application" REDIRECT_INPUT="false" PASS_PARENT_ENVS_2="true" PROJECT_NAME="sequential_pde_solver" TARGET_NAME="sequential_pde_solver" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="sequential_pde_solver" RUN_TARGET_NAME="sequential_pde_solver">
+      <method v="2">
+        <option name="com.jetbrains.cidr.execution.CidrBuildBeforeRunTaskProvider$BuildBeforeRunTask" enabled="true" />
+      </method>
+    </configuration>
+    <configuration default="true" type="GradleAppRunConfiguration" factoryName="Application" REDIRECT_INPUT="false" PASS_PARENT_ENVS_2="true">
+      <method v="2">
+        <option name="com.jetbrains.cidr.cpp.gradle.execution.GradleNativeBuildBeforeRunTaskProvider$BuildBeforeRunTask" enabled="true" />
+      </method>
+    </configuration>
+  </component>
+  <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="application-level" UseSingleDictionary="true" transferred="true" />
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="92ac5742-cd33-4ae4-93a5-0efa1f4825cd" name="Default Changelist" comment="" />
+      <created>1597931660969</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1597931660969</updated>
+      <workItem from="1597931662790" duration="1117000" />
+      <workItem from="1598003807783" duration="643000" />
+      <workItem from="1599206154021" duration="3280000" />
+    </task>
+    <task id="LOCAL-00001" summary="initial branch commit">
+      <created>1599206355929</created>
+      <option name="number" value="00001" />
+      <option name="presentableId" value="LOCAL-00001" />
+      <option name="project" value="LOCAL" />
+      <updated>1599206355929</updated>
+    </task>
+    <option name="localTasksCounter" value="2" />
+    <servers />
+  </component>
+  <component name="Vcs.Log.Tabs.Properties">
+    <option name="TAB_STATES">
+      <map>
+        <entry key="MAIN">
+          <value>
+            <State />
+          </value>
+        </entry>
+      </map>
+    </option>
+  </component>
+  <component name="VcsManagerConfiguration">
+    <MESSAGE value="initial branch commit" />
+    <option name="LAST_COMMIT_MESSAGE" value="initial branch commit" />
+  </component>
+  <component name="WindowStateProjectService">
+    <state x="2654" y="359" key="#com.intellij.execution.impl.EditConfigurationsDialog" timestamp="1597932098993">
+      <screen x="1920" y="0" width="2560" height="1410" />
+    </state>
+    <state x="2654" y="359" key="#com.intellij.execution.impl.EditConfigurationsDialog/0.0.1920.1050/1920.0.2560.1410/4480.-640.1440.2530@1920.0.2560.1410" timestamp="1597932098993" />
+    <state x="729" y="-981" key="FileChooserDialogImpl" timestamp="1599232381903">
+      <screen x="-331" y="-1440" width="2560" height="1410" />
+    </state>
+    <state x="729" y="-981" key="FileChooserDialogImpl/0.0.1920.1050/-331.-1440.2560.1410@-331.-1440.2560.1410" timestamp="1599232381903" />
+    <state x="2980" y="459" key="FileChooserDialogImpl/0.0.1920.1050/1920.0.2560.1410/4480.-640.1440.2530@1920.0.2560.1410" timestamp="1597932180261" />
+    <state x="5076" y="184" key="FileChooserDialogImpl/0.0.1920.1050/4480.-640.1440.2530/1920.0.2560.1410@4480.-640.1440.2530" timestamp="1598003852421" />
+    <state width="2517" height="496" key="GridCell.Tab.0.bottom" timestamp="1599232403918">
+      <screen x="-331" y="-1440" width="2560" height="1410" />
+    </state>
+    <state width="2517" height="496" key="GridCell.Tab.0.bottom/0.0.1920.1050/-331.-1440.2560.1410@-331.-1440.2560.1410" timestamp="1599232403918" />
+    <state width="2517" height="496" key="GridCell.Tab.0.center" timestamp="1599232403918">
+      <screen x="-331" y="-1440" width="2560" height="1410" />
+    </state>
+    <state width="2517" height="496" key="GridCell.Tab.0.center/0.0.1920.1050/-331.-1440.2560.1410@-331.-1440.2560.1410" timestamp="1599232403918" />
+    <state width="2517" height="496" key="GridCell.Tab.0.left" timestamp="1599232403918">
+      <screen x="-331" y="-1440" width="2560" height="1410" />
+    </state>
+    <state width="2517" height="496" key="GridCell.Tab.0.left/0.0.1920.1050/-331.-1440.2560.1410@-331.-1440.2560.1410" timestamp="1599232403918" />
+    <state width="2517" height="496" key="GridCell.Tab.0.right" timestamp="1599232403918">
+      <screen x="-331" y="-1440" width="2560" height="1410" />
+    </state>
+    <state width="2517" height="496" key="GridCell.Tab.0.right/0.0.1920.1050/-331.-1440.2560.1410@-331.-1440.2560.1410" timestamp="1599232403918" />
+    <state width="2517" height="496" key="GridCell.Tab.1.bottom" timestamp="1599232403918">
+      <screen x="-331" y="-1440" width="2560" height="1410" />
+    </state>
+    <state width="2517" height="496" key="GridCell.Tab.1.bottom/0.0.1920.1050/-331.-1440.2560.1410@-331.-1440.2560.1410" timestamp="1599232403918" />
+    <state width="2517" height="496" key="GridCell.Tab.1.center" timestamp="1599232403918">
+      <screen x="-331" y="-1440" width="2560" height="1410" />
+    </state>
+    <state width="2517" height="496" key="GridCell.Tab.1.center/0.0.1920.1050/-331.-1440.2560.1410@-331.-1440.2560.1410" timestamp="1599232403918" />
+    <state width="2517" height="496" key="GridCell.Tab.1.left" timestamp="1599232403918">
+      <screen x="-331" y="-1440" width="2560" height="1410" />
+    </state>
+    <state width="2517" height="496" key="GridCell.Tab.1.left/0.0.1920.1050/-331.-1440.2560.1410@-331.-1440.2560.1410" timestamp="1599232403918" />
+    <state width="2517" height="496" key="GridCell.Tab.1.right" timestamp="1599232403918">
+      <screen x="-331" y="-1440" width="2560" height="1410" />
+    </state>
+    <state width="2517" height="496" key="GridCell.Tab.1.right/0.0.1920.1050/-331.-1440.2560.1410@-331.-1440.2560.1410" timestamp="1599232403918" />
+    <state x="450" y="-1091" key="SettingsEditor" timestamp="1599206759173">
+      <screen x="-331" y="-1440" width="2560" height="1410" />
+    </state>
+    <state x="450" y="-1091" key="SettingsEditor/0.0.1920.1050/-331.-1440.2560.1410@-331.-1440.2560.1410" timestamp="1599206759173" />
+    <state x="605" y="-387" key="run.anything.popup" timestamp="1599207915579">
+      <screen x="-331" y="-1440" width="2560" height="1410" />
+    </state>
+    <state x="605" y="-387" key="run.anything.popup/0.0.1920.1050/-331.-1440.2560.1410@-331.-1440.2560.1410" timestamp="1599207915579" />
+  </component>
+  <component name="XDebuggerManager">
+    <breakpoint-manager>
+      <breakpoints>
+        <line-breakpoint enabled="true" type="com.jetbrains.cidr.execution.debugger.OCBreakpointType">
+          <url>file://$PROJECT_DIR$/sequential_pde_solver/main.cpp</url>
+          <line>7</line>
+          <option name="timeStamp" value="1" />
+        </line-breakpoint>
+      </breakpoints>
+    </breakpoint-manager>
+  </component>
+</project>
