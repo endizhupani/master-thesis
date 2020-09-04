@@ -1,0 +1,4 @@
+/usr/bin/cmake -DCMAKE_BUILD_TYPE=Debug -G "CodeBlocks - Unix Makefiles" /home/endizhupani/master_thesis/code/master-thesis/sequential_pde_solver
+-- Configuring done
+-- Generating done
+-- Build files have been written to: /home/endizhupani/master_thesis/code/master-thesis/sequential_pde_solver/cmake-build-debug

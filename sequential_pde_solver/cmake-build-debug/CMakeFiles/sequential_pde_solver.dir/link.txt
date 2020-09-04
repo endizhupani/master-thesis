@@ -1,0 +1,1 @@
+/usr/bin/c++  -g   CMakeFiles/sequential_pde_solver.dir/main.cpp.o  -o sequential_pde_solver 

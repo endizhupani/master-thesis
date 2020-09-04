@@ -1,0 +1,188 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="BranchesTreeState">
+    <expand>
+      <path>
+        <item name="ROOT" type="e8cecc67:BranchNodeDescriptor" />
+        <item name="LOCAL_ROOT" type="e8cecc67:BranchNodeDescriptor" />
+      </path>
+      <path>
+        <item name="ROOT" type="e8cecc67:BranchNodeDescriptor" />
+        <item name="LOCAL_ROOT" type="e8cecc67:BranchNodeDescriptor" />
+        <item name="GROUP_NODE:feature" type="e8cecc67:BranchNodeDescriptor" />
+      </path>
+      <path>
+        <item name="ROOT" type="e8cecc67:BranchNodeDescriptor" />
+        <item name="REMOTE_ROOT" type="e8cecc67:BranchNodeDescriptor" />
+      </path>
+      <path>
+        <item name="ROOT" type="e8cecc67:BranchNodeDescriptor" />
+        <item name="REMOTE_ROOT" type="e8cecc67:BranchNodeDescriptor" />
+        <item name="GROUP_NODE:origin" type="e8cecc67:BranchNodeDescriptor" />
+      </path>
+    </expand>
+    <select />
+  </component>
+  <component name="CMakeRunConfigurationManager" shouldGenerate="true" shouldDeleteObsolete="true">
+    <generated>
+      <config projectName="sequential_pde_solver" targetName="sequential_pde_solver" />
+    </generated>
+  </component>
+  <component name="CMakeSettings">
+    <configurations>
+      <configuration PROFILE_NAME="Debug" CONFIG_NAME="Debug" />
+      <configuration PROFILE_NAME="WSL_Profile" CONFIG_NAME="Release" />
+    </configurations>
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="92ac5742-cd33-4ae4-93a5-0efa1f4825cd" name="Default Changelist" comment="">
+      <change afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sequential_pde_solver/.idea/.gitignore" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sequential_pde_solver/.idea/deployment.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sequential_pde_solver/.idea/misc.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sequential_pde_solver/.idea/modules.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sequential_pde_solver/.idea/sequential_pde_solver.iml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sequential_pde_solver/.idea/vcs.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sequential_pde_solver/CMakeLists.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sequential_pde_solver/cmake-build-debug/CMakeCache.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sequential_pde_solver/cmake-build-debug/CMakeFiles/3.16.3/CMakeCCompiler.cmake" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sequential_pde_solver/cmake-build-debug/CMakeFiles/3.16.3/CMakeCXXCompiler.cmake" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sequential_pde_solver/cmake-build-debug/CMakeFiles/3.16.3/CMakeDetermineCompilerABI_C.bin" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sequential_pde_solver/cmake-build-debug/CMakeFiles/3.16.3/CMakeDetermineCompilerABI_CXX.bin" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sequential_pde_solver/cmake-build-debug/CMakeFiles/3.16.3/CMakeSystem.cmake" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sequential_pde_solver/cmake-build-debug/CMakeFiles/3.16.3/CompilerIdC/CMakeCCompilerId.c" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sequential_pde_solver/cmake-build-debug/CMakeFiles/3.16.3/CompilerIdCXX/CMakeCXXCompilerId.cpp" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sequential_pde_solver/cmake-build-debug/CMakeFiles/CMakeDirectoryInformation.cmake" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sequential_pde_solver/cmake-build-debug/CMakeFiles/CMakeOutput.log" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sequential_pde_solver/cmake-build-debug/CMakeFiles/Makefile.cmake" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sequential_pde_solver/cmake-build-debug/CMakeFiles/Makefile2" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sequential_pde_solver/cmake-build-debug/CMakeFiles/TargetDirectories.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sequential_pde_solver/cmake-build-debug/CMakeFiles/clion-environment.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sequential_pde_solver/cmake-build-debug/CMakeFiles/clion-log.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sequential_pde_solver/cmake-build-debug/CMakeFiles/cmake.check_cache" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sequential_pde_solver/cmake-build-debug/CMakeFiles/progress.marks" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sequential_pde_solver/cmake-build-debug/CMakeFiles/sequential_pde_solver.dir/DependInfo.cmake" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sequential_pde_solver/cmake-build-debug/CMakeFiles/sequential_pde_solver.dir/build.make" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sequential_pde_solver/cmake-build-debug/CMakeFiles/sequential_pde_solver.dir/cmake_clean.cmake" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sequential_pde_solver/cmake-build-debug/CMakeFiles/sequential_pde_solver.dir/depend.make" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sequential_pde_solver/cmake-build-debug/CMakeFiles/sequential_pde_solver.dir/flags.make" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sequential_pde_solver/cmake-build-debug/CMakeFiles/sequential_pde_solver.dir/link.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sequential_pde_solver/cmake-build-debug/CMakeFiles/sequential_pde_solver.dir/progress.make" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sequential_pde_solver/cmake-build-debug/Makefile" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sequential_pde_solver/cmake-build-debug/cmake_install.cmake" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sequential_pde_solver/cmake-build-debug/sequential_pde_solver.cbp" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sequential_pde_solver/cmake-build-wsl_profile/CMakeCache.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sequential_pde_solver/cmake-build-wsl_profile/CMakeFiles/3.16.3/CMakeCCompiler.cmake" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sequential_pde_solver/cmake-build-wsl_profile/CMakeFiles/3.16.3/CMakeCXXCompiler.cmake" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sequential_pde_solver/cmake-build-wsl_profile/CMakeFiles/3.16.3/CMakeDetermineCompilerABI_C.bin" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sequential_pde_solver/cmake-build-wsl_profile/CMakeFiles/3.16.3/CMakeDetermineCompilerABI_CXX.bin" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sequential_pde_solver/cmake-build-wsl_profile/CMakeFiles/3.16.3/CMakeSystem.cmake" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sequential_pde_solver/cmake-build-wsl_profile/CMakeFiles/3.16.3/CompilerIdC/CMakeCCompilerId.c" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sequential_pde_solver/cmake-build-wsl_profile/CMakeFiles/3.16.3/CompilerIdCXX/CMakeCXXCompilerId.cpp" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sequential_pde_solver/cmake-build-wsl_profile/CMakeFiles/CMakeDirectoryInformation.cmake" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sequential_pde_solver/cmake-build-wsl_profile/CMakeFiles/CMakeOutput.log" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sequential_pde_solver/cmake-build-wsl_profile/CMakeFiles/Makefile.cmake" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sequential_pde_solver/cmake-build-wsl_profile/CMakeFiles/Makefile2" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sequential_pde_solver/cmake-build-wsl_profile/CMakeFiles/TargetDirectories.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sequential_pde_solver/cmake-build-wsl_profile/CMakeFiles/clion-environment.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sequential_pde_solver/cmake-build-wsl_profile/CMakeFiles/clion-log.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sequential_pde_solver/cmake-build-wsl_profile/CMakeFiles/cmake.check_cache" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sequential_pde_solver/cmake-build-wsl_profile/CMakeFiles/progress.marks" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sequential_pde_solver/cmake-build-wsl_profile/CMakeFiles/sequential_pde_solver.dir/CXX.includecache" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sequential_pde_solver/cmake-build-wsl_profile/CMakeFiles/sequential_pde_solver.dir/DependInfo.cmake" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sequential_pde_solver/cmake-build-wsl_profile/CMakeFiles/sequential_pde_solver.dir/build.make" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sequential_pde_solver/cmake-build-wsl_profile/CMakeFiles/sequential_pde_solver.dir/cmake_clean.cmake" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sequential_pde_solver/cmake-build-wsl_profile/CMakeFiles/sequential_pde_solver.dir/depend.internal" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sequential_pde_solver/cmake-build-wsl_profile/CMakeFiles/sequential_pde_solver.dir/depend.make" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sequential_pde_solver/cmake-build-wsl_profile/CMakeFiles/sequential_pde_solver.dir/flags.make" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sequential_pde_solver/cmake-build-wsl_profile/CMakeFiles/sequential_pde_solver.dir/link.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sequential_pde_solver/cmake-build-wsl_profile/CMakeFiles/sequential_pde_solver.dir/progress.make" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sequential_pde_solver/cmake-build-wsl_profile/Makefile" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sequential_pde_solver/cmake-build-wsl_profile/cmake_install.cmake" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sequential_pde_solver/cmake-build-wsl_profile/sequential_pde_solver" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sequential_pde_solver/cmake-build-wsl_profile/sequential_pde_solver.cbp" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/sequential_pde_solver/main.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="ClangdSettings">
+    <option name="formatViaClangd" value="false" />
+  </component>
+  <component name="ExecutionTargetManager" SELECTED_TARGET="CMakeBuildProfile:Debug" />
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="ProjectId" id="1gMk4pQsPfcZ0idtTt57jEXBbXN" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent">
+    <property name="RunOnceActivity.OpenProjectViewOnStart" value="true" />
+    <property name="WebServerToolWindowFactoryState" value="true" />
+    <property name="cf.first.check.clang-format" value="false" />
+    <property name="last_opened_file_path" value="$PROJECT_DIR$/sequential_pde_solver/CMakeLists.txt" />
+    <property name="settings.editor.selected.configurable" value="CMakeSettings" />
+  </component>
+  <component name="RunManager">
+    <configuration default="true" type="CLion_Remote" toolchainName="WSL" remoteCommand="" symbolFile="" sysroot="">
+      <method v="2" />
+    </configuration>
+    <configuration default="true" type="CMakeRunConfiguration" factoryName="Application" REDIRECT_INPUT="false" PASS_PARENT_ENVS_2="true">
+      <method v="2">
+        <option name="com.jetbrains.cidr.execution.CidrBuildBeforeRunTaskProvider$BuildBeforeRunTask" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="sequential_pde_solver" type="CMakeRunConfiguration" factoryName="Application" REDIRECT_INPUT="false" PASS_PARENT_ENVS_2="true" PROJECT_NAME="sequential_pde_solver" TARGET_NAME="sequential_pde_solver" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="sequential_pde_solver" RUN_TARGET_NAME="sequential_pde_solver">
+      <method v="2">
+        <option name="com.jetbrains.cidr.execution.CidrBuildBeforeRunTaskProvider$BuildBeforeRunTask" enabled="true" />
+      </method>
+    </configuration>
+    <configuration default="true" type="GradleAppRunConfiguration" factoryName="Application" REDIRECT_INPUT="false" PASS_PARENT_ENVS_2="true">
+      <method v="2">
+        <option name="com.jetbrains.cidr.cpp.gradle.execution.GradleNativeBuildBeforeRunTaskProvider$BuildBeforeRunTask" enabled="true" />
+      </method>
+    </configuration>
+  </component>
+  <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="application-level" UseSingleDictionary="true" transferred="true" />
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="92ac5742-cd33-4ae4-93a5-0efa1f4825cd" name="Default Changelist" comment="" />
+      <created>1597931660969</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1597931660969</updated>
+      <workItem from="1597931662790" duration="1117000" />
+      <workItem from="1598003807783" duration="643000" />
+      <workItem from="1599206154021" duration="111000" />
+    </task>
+    <servers />
+  </component>
+  <component name="Vcs.Log.Tabs.Properties">
+    <option name="TAB_STATES">
+      <map>
+        <entry key="MAIN">
+          <value>
+            <State />
+          </value>
+        </entry>
+      </map>
+    </option>
+  </component>
+  <component name="WindowStateProjectService">
+    <state x="2654" y="359" key="#com.intellij.execution.impl.EditConfigurationsDialog" timestamp="1597932098993">
+      <screen x="1920" y="0" width="2560" height="1410" />
+    </state>
+    <state x="2654" y="359" key="#com.intellij.execution.impl.EditConfigurationsDialog/0.0.1920.1050/1920.0.2560.1410/4480.-640.1440.2530@1920.0.2560.1410" timestamp="1597932098993" />
+    <state x="729" y="-981" key="FileChooserDialogImpl" timestamp="1599206177926">
+      <screen x="-331" y="-1440" width="2560" height="1410" />
+    </state>
+    <state x="729" y="-981" key="FileChooserDialogImpl/0.0.1920.1050/-331.-1440.2560.1410@-331.-1440.2560.1410" timestamp="1599206177926" />
+    <state x="2980" y="459" key="FileChooserDialogImpl/0.0.1920.1050/1920.0.2560.1410/4480.-640.1440.2530@1920.0.2560.1410" timestamp="1597932180261" />
+    <state x="5076" y="184" key="FileChooserDialogImpl/0.0.1920.1050/4480.-640.1440.2530/1920.0.2560.1410@4480.-640.1440.2530" timestamp="1598003852421" />
+  </component>
+</project>
