@@ -1,0 +1,3 @@
+/home/endizhupani/master_thesis/code/master-thesis/sequential_pde_solver/cmake-build-wsl_profile/CMakeFiles/rebuild_cache.dir
+/home/endizhupani/master_thesis/code/master-thesis/sequential_pde_solver/cmake-build-wsl_profile/CMakeFiles/edit_cache.dir
+/home/endizhupani/master_thesis/code/master-thesis/sequential_pde_solver/cmake-build-wsl_profile/CMakeFiles/sequential_pde_solver.dir
