@@ -9,15 +9,14 @@ int getChunkSize(int arraySize);
 
 int main()
 {
-    int n_threads = 1, i, j;
+    int n_threads = 4, i, j;
     printf("Running on max %d threads.\n", n_threads);
     omp_set_num_threads(n_threads);
-    double mean;
+    double globalDiff;
+    double mean = 0.0;
     double *u = new double[N * N];
     double *w = new double[N * N];
     double *tmp;
-
-    mean = 0, 0;
 
 #pragma omp parallel default(none) private(i) shared(u, w) reduction(+ \
                                                                      : mean)
@@ -53,7 +52,7 @@ int main()
     for (;;)
     {
         num_iter++;
-        double globalDiff = 0.0;
+        globalDiff = 0.0;
         double calc_loop_start = omp_get_wtime();
 #pragma omp parallel default(none) private(i) firstprivate(u, w, num_iter) reduction(max \
                                                                                      : globalDiff)
