@@ -2,7 +2,7 @@
 #include <math.h>
 #include <chrono>
 
-#define N 100
+#define N 5000
 #define EPSILON 0.01
 
 void run_matrix_as_array()
@@ -79,6 +79,7 @@ void run_matrix_as_array()
     }
 
     auto full_calc_finish = std::chrono::high_resolution_clock::now();
+    printf("Results with matrix stored as row major array: \n");
     printf("num_iter: %d\n", num_iter);
     std::chrono::duration<double> elapsed = full_calc_finish - full_calc_start;
     printf("full_calc_time: %f\n", elapsed.count());
@@ -96,60 +97,65 @@ void run_matrix_as_array()
 
     delete[] u;
     delete[] w;
-
-    printf("Solved\n");
 }
 
-int main()
+void run_matrix_as_matrix()
 {
-    //double diff, mean;
+
+    double globalDiff, mean;
     int i, j;
-    double globalDiff;
-    double mean = 0.0;
-    double *u = new double[N * N];
-    double *w = new double[N * N];
-    double *tmp;
+    auto u = new double[N][N];
+    // for (i = 0; i < N; i++)
+    // {
+    //     u[i] = new double[N];
+    // }
+
+    auto w = new double[N][N];
+    // for (i = 0; i < N; i++)
+    // {
+    //     w[i] = new double[N];
+    // }
+
+    //double **tmp;
+
+    mean = 0.0;
     for (i = 0; i < N; i++)
     {
-        u[i * N] = u[i * N + (N - 1)] = u[i] = w[i * N] = w[i * N + (N - 1)] = w[i] = 100;
-        u[(N - 1) * N + i] = w[(N - 1) * N + i] = 0;
-        mean += u[i * N] + u[i * N + (N - 1)] + u[i] + u[(N - 1) * N + i];
+        u[i][0] = w[i][0] = u[i][N - 1] = w[i][N - 1] = u[0][i] = w[0][i] = 100;
+        u[N - 1][i] = w[N - 1][i] = 0;
+        mean += u[i][0] + u[i][N - 1] + u[0][i] + u[N - 1][i];
     }
 
     mean /= (4 * N);
 
-    for (i = N; i < (N * N) - N; i++)
+    for (i = 1; i < N - 1; i++)
     {
-        if (i % N == 0 || (i - (N - 1)) % N == 0)
+        for (j = 1; j < N - 1; j++)
         {
-            continue;
+            u[i][j] = mean;
         }
-        u[i] = mean;
     }
-
     auto full_calc_start = std::chrono::high_resolution_clock::now();
     int num_iter = 0;
     double calc_loop_min = 1000000;
     double calc_loop_max = 0;
     double calc_loop_avg = 0;
-
     for (;;)
     {
         num_iter++;
         globalDiff = 0.0;
 
         auto calc_loop_start = std::chrono::high_resolution_clock::now();
-        for (i = N + 1; i < (N * N) - N - 1; i++)
+        for (i = 1; i < N - 1; i++)
         {
-            if (i % N == 0 || (i - (N - 1)) % N == 0)
+            for (j = 1; j < N - 1; j++)
             {
-                continue;
-            }
+                w[i][j] = (u[i - 1][j] + u[i + 1][j] + u[i][j - 1] + u[i][j + 1]) / 4;
 
-            w[i] = (u[i - 1] + u[i + 1] + u[i - N] + u[i + N]) / 4;
-            if (fabs(w[i] - u[i]) > globalDiff)
-            {
-                globalDiff = fabs(w[i] - u[i]);
+                if (fabs(w[i][j] - u[i][j]) > globalDiff)
+                {
+                    globalDiff = fabs(w[i][j] - u[i][j]);
+                }
             }
         }
         auto calc_loop_end = std::chrono::high_resolution_clock::now();
@@ -168,13 +174,11 @@ int main()
 
         if (globalDiff <= EPSILON)
             break;
-
-        tmp = u;
-        u = w;
-        w = tmp;
+        std::swap(w, u);
     }
 
     auto full_calc_finish = std::chrono::high_resolution_clock::now();
+    printf("Results with matrix stored as array of pointers: \n");
     printf("num_iter: %d\n", num_iter);
     std::chrono::duration<double> elapsed = full_calc_finish - full_calc_start;
     printf("full_calc_time: %f\n", elapsed.count());
@@ -182,16 +186,29 @@ int main()
     printf("calc_loop_min: %f\n", calc_loop_min);
     printf("calc_loop_max: %f\n", calc_loop_max);
     printf("calc_loop_avg: %f\n", calc_loop_avg / num_iter);
+    // for(i = 0; i < N; i++){
+    // for (j = 0; j < N; j++) {
+    //     printf("%6.2f ", u[i][j]);
+    // }
+    // putchar('\n');
 
-    //        for(i = 0; i < N; i++){
-    //        for (j = 0; j < N; j++) {
-    //            printf("%6.2f ", u[i][j]);
-    //        }
-    //        putchar('\n');
-    //    }
+    // for (i = 0; i < N; i++)
+    // {
+    //     delete[] u[i];
+    // }
 
     delete[] u;
-    delete[] w;
 
-    printf("Solved\n");
+    // for (i = 0; i < N; i++)
+    // {
+    //     delete[] w[i];
+    // }
+
+    delete[] w;
+}
+
+int main()
+{
+    run_matrix_as_matrix();
+    run_matrix_as_array();
 }
