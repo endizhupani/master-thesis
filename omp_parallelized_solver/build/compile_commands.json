@@ -1,0 +1,7 @@
+[
+{
+  "directory": "/home/endizhupani/master_thesis/code/master-thesis/omp_parallelized_solver/build",
+  "command": "/bin/g++-9     -fopenmp -g   -std=gnu++14 -o CMakeFiles/omp_parallelized_solver.dir/main.cpp.o -c /home/endizhupani/master_thesis/code/master-thesis/omp_parallelized_solver/main.cpp",
+  "file": "/home/endizhupani/master_thesis/code/master-thesis/omp_parallelized_solver/main.cpp"
+}
+]
