@@ -1,12 +1,20 @@
 #include <iostream>
 #include <math.h>
 #include <chrono>
+#include <array>
 
-#define N 5000
+#define N 10000000
 #define EPSILON 0.01
 
 void run_matrix_as_array()
 {
+    std::array<int, N> myArray;
+    for (int i = 0; i < N; i++)
+    {
+        myArray[i] = i;
+    }
+
+    return;
     int i, j;
     double globalDiff;
     double mean = 0.0;
@@ -50,11 +58,12 @@ void run_matrix_as_array()
                 continue;
             }
 
-            w[i] = (u[i - 1] + u[i + 1] + u[i - N] + u[i + N]) / 4;
-            if (fabs(w[i] - u[i]) > globalDiff)
-            {
-                globalDiff = fabs(w[i] - u[i]);
-            }
+            // w[i] = (u[i - 1] + u[i + 1] + u[i - N] + u[i + N]) / 4;
+            // if (fabs(w[i] - u[i]) > globalDiff)
+            // {
+            //     globalDiff = fabs(w[i] - u[i]);
+            // }
+            w[i] = u[i];
         }
         auto calc_loop_end = std::chrono::high_resolution_clock::now();
         std::chrono::duration<double> calc_loop_elapsed = calc_loop_end - calc_loop_start;
@@ -70,7 +79,7 @@ void run_matrix_as_array()
 
         calc_loop_avg += calc_loop_elapsed.count();
 
-        if (globalDiff <= EPSILON)
+        if (globalDiff <= EPSILON || num_iter > 1815)
             break;
 
         tmp = u;
@@ -209,6 +218,6 @@ void run_matrix_as_matrix()
 
 int main()
 {
-    run_matrix_as_matrix();
+    //run_matrix_as_matrix();
     run_matrix_as_array();
 }

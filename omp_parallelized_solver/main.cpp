@@ -2,9 +2,9 @@
 #include <math.h>
 #include <omp.h>
 using namespace std;
-#define N 1000
+#define N 10000
 #define EPSILON 0.01
-#define N_THREADS 4
+#define N_THREADS 2
 
 int getChunkSize(int arraySize);
 
@@ -13,6 +13,7 @@ void run_matrix_as_matrix()
     int i, j;
     printf("Running on max %d threads.\nMatrix is stored as a matrix.\nMatrix size: %d rows by %d columns\n", N_THREADS, N, N);
     omp_set_num_threads(N_THREADS);
+
     double globalDiff;
     double mean = 0.0;
     auto u = new double[N][N];
@@ -63,12 +64,13 @@ void run_matrix_as_matrix()
             {
                 for (j = 1; j < N - 1; j++)
                 {
-                    w[i][j] = (u[i - 1][j] + u[i + 1][j] + u[i][j - 1] + u[i][j + 1]) / 4;
+                    // w[i][j] = (u[i - 1][j] + u[i + 1][j] + u[i][j - 1] + u[i][j + 1]) / 4;
 
-                    if (fabs(w[i][j] - u[i][j]) > globalDiff)
-                    {
-                        globalDiff = fabs(w[i][j] - u[i][j]);
-                    }
+                    // if (fabs(w[i][j] - u[i][j]) > globalDiff)
+                    // {
+                    //     globalDiff = fabs(w[i][j] - u[i][j]);
+                    // }
+                    w[i][j] = u[i][j];
                 }
             }
         }
@@ -84,7 +86,7 @@ void run_matrix_as_matrix()
             calc_loop_max = calc_loop_dur;
         }
 
-        if (globalDiff <= EPSILON)
+        if (globalDiff <= EPSILON || num_iter > 1815)
             break;
         swap(w, u);
         // #pragma omp parallel default(none) private(i, j) firstprivate(u, w)
@@ -215,7 +217,7 @@ int main()
 {
     run_matrix_as_matrix();
     printf("======================================\n");
-    run_matrix_as_array();
+    //run_matrix_as_array();
     printf("Solved\n");
 }
 

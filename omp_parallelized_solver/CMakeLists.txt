@@ -1,4 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
+set(CMAKE_VERBOSE_MAKEFILE ON)
 set(project_name omp_parallelized_solver)
 project(${project_name})
 
@@ -7,7 +8,7 @@ find_package(OpenMP REQUIRED)
 
 set(executable main.cpp)
 
-set(executable_name ${project_name})
+set(executable_name ${project_name}.exe)
 #
 #set(OPENMP_FLAGS "")
 #
