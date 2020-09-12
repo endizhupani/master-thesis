@@ -2,7 +2,7 @@
 #include <math.h>
 #include <omp.h>
 using namespace std;
-#define N 10000
+#define N 5000
 #define EPSILON 0.01
 #define N_THREADS 2
 
@@ -64,13 +64,12 @@ void run_matrix_as_matrix()
             {
                 for (j = 1; j < N - 1; j++)
                 {
-                    // w[i][j] = (u[i - 1][j] + u[i + 1][j] + u[i][j - 1] + u[i][j + 1]) / 4;
+                    w[i][j] = (u[i - 1][j] + u[i + 1][j] + u[i][j - 1] + u[i][j + 1]) / 4;
 
-                    // if (fabs(w[i][j] - u[i][j]) > globalDiff)
-                    // {
-                    //     globalDiff = fabs(w[i][j] - u[i][j]);
-                    // }
-                    w[i][j] = u[i][j];
+                    if (fabs(w[i][j] - u[i][j]) > globalDiff)
+                    {
+                        globalDiff = fabs(w[i][j] - u[i][j]);
+                    }
                 }
             }
         }
@@ -86,7 +85,7 @@ void run_matrix_as_matrix()
             calc_loop_max = calc_loop_dur;
         }
 
-        if (globalDiff <= EPSILON || num_iter > 1815)
+        if (globalDiff <= EPSILON)
             break;
         swap(w, u);
         // #pragma omp parallel default(none) private(i, j) firstprivate(u, w)
@@ -169,11 +168,13 @@ void run_matrix_as_array()
                 {
                     continue;
                 }
-
+                auto previous = u[i];
                 w[i] = (u[i - 1] + u[i + 1] + u[i - N] + u[i + N]) / 4;
-                if (fabs(w[i] - u[i]) > globalDiff)
+
+                auto currentDifference = fabs(w[i] - previous);
+                if (currentDifference > globalDiff)
                 {
-                    globalDiff = fabs(w[i] - u[i]);
+                    globalDiff = currentDifference;
                 }
             }
         }
@@ -217,7 +218,7 @@ int main()
 {
     run_matrix_as_matrix();
     printf("======================================\n");
-    //run_matrix_as_array();
+    run_matrix_as_array();
     printf("Solved\n");
 }
 
