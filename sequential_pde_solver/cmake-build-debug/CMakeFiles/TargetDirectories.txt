@@ -1,3 +1,0 @@
-/home/endizhupani/master_thesis/code/master-thesis/sequential_pde_solver/cmake-build-debug/CMakeFiles/rebuild_cache.dir
-/home/endizhupani/master_thesis/code/master-thesis/sequential_pde_solver/cmake-build-debug/CMakeFiles/edit_cache.dir
-/home/endizhupani/master_thesis/code/master-thesis/sequential_pde_solver/cmake-build-debug/CMakeFiles/sequential_pde_solver.dir
