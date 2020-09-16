@@ -1,12 +1,16 @@
 #include <iostream>
 #include <math.h>
 #include <omp.h>
+#include <cstdlib>
+#include "cache_helpers.h"
 using namespace std;
 #define N 5000
 #define EPSILON 0.01
-#define N_THREADS 2
+#define N_THREADS 4
+#define MAX_ITER 10000
+//#define CACHE_LINE_SIZE sysconf(_SC_LEVEL1_DCACHE_LINESIZE)
 
-int getChunkSize(int arraySize);
+int getChunkSize(int arrayCount, int numElPerLine);
 
 void run_matrix_as_matrix()
 {
@@ -51,26 +55,22 @@ void run_matrix_as_matrix()
 
     double start = omp_get_wtime();
     int num_iter = 0;
-    for (;;)
+
+    while (globalDiff > EPSILON && num_iter < MAX_ITER)
     {
-        num_iter++;
         globalDiff = 0.0;
         double calc_loop_start = omp_get_wtime();
-#pragma omp parallel default(none) private(i, j) firstprivate(u, w) reduction(max \
-                                                                              : globalDiff)
+        for (i = 1; i < N - 1; i++)
         {
-#pragma omp for schedule(static)
-            for (i = 1; i < N - 1; i++)
+            for (j = 1; j < N - 1; j++)
             {
-                for (j = 1; j < N - 1; j++)
-                {
-                    w[i][j] = (u[i - 1][j] + u[i + 1][j] + u[i][j - 1] + u[i][j + 1]) / 4;
+                w[i][j] = (u[i - 1][j] + u[i + 1][j] + u[i][j - 1] + u[i][j + 1]) / 4;
 
-                    if (fabs(w[i][j] - u[i][j]) > globalDiff)
-                    {
-                        globalDiff = fabs(w[i][j] - u[i][j]);
-                    }
-                }
+                globalDiff = max(globalDiff, fabs(w[i][j] - u[i][j]));
+                // if (fabs(w[i][j] - u[i][j]) > globalDiff)
+                // {
+                //     globalDiff = fabs(w[i][j] - u[i][j]);
+                // }
             }
         }
         double calc_loop_dur = omp_get_wtime() - calc_loop_start;
@@ -84,22 +84,57 @@ void run_matrix_as_matrix()
         {
             calc_loop_max = calc_loop_dur;
         }
-
-        if (globalDiff <= EPSILON)
-            break;
         swap(w, u);
-        // #pragma omp parallel default(none) private(i, j) firstprivate(u, w)
-        //         {
-        // #pragma omp for schedule(static)
-        //             for (i = 1; i < N - 1; i++)
-        //             {
-        //                 for (j = 1; j < N - 1; j++)
-        //                 {
-        //                     u[i][j] = w[i][j];
-        //                 }
-        //             }
-        //         }
     }
+    //     for (;;)
+    //     {
+    //         num_iter++;
+    //         globalDiff = 0.0;
+    //         double calc_loop_start = omp_get_wtime();
+    // #pragma omp parallel default(none) private(i, j) firstprivate(u, w) reduction(max \
+//                                                                               : globalDiff)
+    //         {
+    // #pragma omp for schedule(static)
+    //             for (i = 1; i < N - 1; i++)
+    //             {
+    //                 for (j = 1; j < N - 1; j++)
+    //                 {
+    //                     w[i][j] = (u[i - 1][j] + u[i + 1][j] + u[i][j - 1] + u[i][j + 1]) / 4;
+
+    //                     if (fabs(w[i][j] - u[i][j]) > globalDiff)
+    //                     {
+    //                         globalDiff = fabs(w[i][j] - u[i][j]);
+    //                     }
+    //                 }
+    //             }
+    //         }
+    //         double calc_loop_dur = omp_get_wtime() - calc_loop_start;
+    //         calc_loop_avg += calc_loop_dur;
+    //         if (calc_loop_dur < calc_loop_min)
+    //         {
+    //             calc_loop_min = calc_loop_dur;
+    //         }
+
+    //         if (calc_loop_dur > calc_loop_max)
+    //         {
+    //             calc_loop_max = calc_loop_dur;
+    //         }
+
+    //         if (globalDiff <= EPSILON)
+    //             break;
+    //         swap(w, u);
+    //         // #pragma omp parallel default(none) private(i, j) firstprivate(u, w)
+    //         //         {
+    //         // #pragma omp for schedule(static)
+    //         //             for (i = 1; i < N - 1; i++)
+    //         //             {
+    //         //                 for (j = 1; j < N - 1; j++)
+    //         //                 {
+    //         //                     u[i][j] = w[i][j];
+    //         //                 }
+    //         //             }
+    //         //         }
+    //     }
 
     double end = omp_get_wtime();
     printf("time ellapsed = %f\n", end - start);
@@ -114,18 +149,22 @@ void run_matrix_as_matrix()
 void run_matrix_as_array()
 {
     int i, j;
-    printf("Running on max %d threads.\nMatrix is stored as an array.\nMatrix size: %d rows by %d columns\n", N_THREADS, N, N);
+    size_t cache_line_size_b = CacheLineSize();
+    int dp_per_line = cache_line_size_b / sizeof(double);
+    printf("Running on max %d threads.\nMatrix is stored as an array.\nMatrix size: %d rows by %d columns\nCache line size %zu\n", N_THREADS, N, N, cache_line_size_b);
+
     omp_set_num_threads(N_THREADS);
     double globalDiff;
     double mean = 0.0;
-    double *u = new double[N * N];
-    double *w = new double[N * N];
+    double *u = static_cast<double *>(aligned_alloc(cache_line_size_b, N * N * sizeof(double)));
+
+    double *w = static_cast<double *>(aligned_alloc(cache_line_size_b, N * N * sizeof(double))); //new double[N * N];
     double *tmp;
 
-#pragma omp parallel default(none) private(i) shared(u, w) reduction(+ \
-                                                                     : mean)
+#pragma omp parallel default(none) private(i) firstprivate(dp_per_line) shared(u, w) reduction(+ \
+                                                                                               : mean)
     {
-#pragma omp for schedule(static, getChunkSize(N *N))
+#pragma omp for schedule(static, getChunkSize(N *N, dp_per_line))
         for (i = 0; i < N; i++)
         {
             u[i * N] = u[i * N + (N - 1)] = u[i] = w[i * N] = w[i * N + (N - 1)] = w[i] = 100;
@@ -134,9 +173,9 @@ void run_matrix_as_array()
         }
     }
     mean /= (4 * N);
-#pragma omp parallel default(none) shared(u) private(i) firstprivate(mean)
+#pragma omp parallel default(none) shared(u) private(i) firstprivate(mean, dp_per_line)
     {
-#pragma omp for schedule(static, getChunkSize(N *N))
+#pragma omp for schedule(static, getChunkSize(N *N, dp_per_line))
         for (i = N; i < (N * N) - N; i++)
         {
             if (i % N == 0 || (i - (N - 1)) % N == 0)
@@ -158,10 +197,10 @@ void run_matrix_as_array()
         num_iter++;
         globalDiff = 0.0;
         double calc_loop_start = omp_get_wtime();
-#pragma omp parallel default(none) private(i) firstprivate(u, w, num_iter) reduction(max \
-                                                                                     : globalDiff)
+#pragma omp parallel default(none) private(i) firstprivate(u, w, num_iter, dp_per_line) reduction(max \
+                                                                                                  : globalDiff)
         {
-#pragma omp for schedule(static, getChunkSize(N *N))
+#pragma omp for schedule(dynamic) //, getChunkSize(N *N, dp_per_line))
             for (i = N + 1; i < (N * N) - N - 1; i++)
             {
                 if (i % N == 0 || (i - (N - 1)) % N == 0)
@@ -210,20 +249,26 @@ void run_matrix_as_array()
     //        }
     //        putchar('\n');
     //    }
-    delete[] u;
-    delete[] w;
+    // delete[] u;
+    // delete[] w;
+    free(w);
+    free(u);
 }
 
 int main()
 {
-    run_matrix_as_matrix();
+    //run_matrix_as_matrix();
     printf("======================================\n");
     run_matrix_as_array();
     printf("Solved\n");
 }
 
-int getChunkSize(int arraySize)
+int getChunkSize(int arrayCount, int numElPerLine)
 {
     int num_threads = omp_get_num_threads();
-    return ceil((double)arraySize / num_threads);
+
+    int chunk_size = ceil((double)arrayCount / num_threads);
+    chunk_size += (chunk_size % numElPerLine);
+
+    return chunk_size;
 }
