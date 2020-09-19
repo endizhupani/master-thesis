@@ -4,145 +4,86 @@
 #include <cstdlib>
 #include "cache_helpers.h"
 using namespace std;
-#define N 5000
-#define EPSILON 0.01
-#define N_THREADS 4
-#define MAX_ITER 10000
+#define N 4000
+#define EPSILON -5
+#define N_THREADS 8
+#define MAX_ITER 1815
 //#define CACHE_LINE_SIZE sysconf(_SC_LEVEL1_DCACHE_LINESIZE)
 
 int getChunkSize(int arrayCount, int numElPerLine);
 
 void run_matrix_as_matrix()
 {
-    int i, j;
     printf("Running on max %d threads.\nMatrix is stored as a matrix.\nMatrix size: %d rows by %d columns\n", N_THREADS, N, N);
     omp_set_num_threads(N_THREADS);
 
-    double globalDiff;
-    double mean = 0.0;
+    double globalDiff = 500;
+    double mean = 0.0, start, end;
     auto u = new double[N][N];
     auto w = new double[N][N];
     double *tmp;
 
-#pragma omp parallel default(none) private(i) shared(u, w) reduction(+ \
-                                                                     : mean)
+#pragma omp parallel for default(none) shared(u, w) schedule(static) reduction(+ \
+                                                                               : mean)
+    for (int i = 0; i < N; i++)
     {
-#pragma omp for schedule(static)
-        for (i = 0; i < N; i++)
-        {
-            u[i][0] = w[i][0] = u[i][N - 1] = w[i][N - 1] = u[0][i] = w[0][i] = 100;
-            u[N - 1][i] = w[N - 1][i] = 0;
+        u[i][0] = w[i][0] = u[i][N - 1] = w[i][N - 1] = u[0][i] = w[0][i] = 100;
+        u[N - 1][i] = w[N - 1][i] = 0;
 
-            mean += u[i][0] + u[i][N - 1] + u[0][i] + u[N - 1][i];
-        }
+        mean += u[i][0] + u[i][N - 1] + u[0][i] + u[N - 1][i];
     }
+
     mean /= (4 * N);
-#pragma omp parallel default(none) shared(u) private(i, j) firstprivate(mean)
+
+#pragma omp parallel for default(none) shared(u) firstprivate(mean) schedule(static)
+    for (int i = 1; i < N - 1; i++)
     {
-#pragma omp for schedule(static)
-        for (i = 1; i < N - 1; i++)
+        for (int j = 1; j < N - 1; j++)
         {
-            for (j = 1; j < N - 1; j++)
-            {
-                u[i][j] = mean;
-            }
+            u[i][j] = mean;
         }
     }
 
-    double calc_loop_min = 1000000;
-    double calc_loop_max = 0;
-    double calc_loop_avg = 0;
-
-    double start = omp_get_wtime();
+    start = omp_get_wtime();
     int num_iter = 0;
 
     while (globalDiff > EPSILON && num_iter < MAX_ITER)
     {
         globalDiff = 0.0;
-        double calc_loop_start = omp_get_wtime();
-        for (i = 1; i < N - 1; i++)
-        {
-            for (j = 1; j < N - 1; j++)
-            {
-                w[i][j] = (u[i - 1][j] + u[i + 1][j] + u[i][j - 1] + u[i][j + 1]) / 4;
 
-                globalDiff = max(globalDiff, fabs(w[i][j] - u[i][j]));
-                // if (fabs(w[i][j] - u[i][j]) > globalDiff)
-                // {
-                //     globalDiff = fabs(w[i][j] - u[i][j]);
-                // }
+#pragma omp parallel for reduction(max \
+                                   : globalDiff) schedule(guided)
+        for (int i = 1; i < N - 1; i++)
+        {
+#pragma omp simd
+            for (int j = 1; j < N - 1; j++)
+            {
+                w[i][j] = 1; //(u[i - 1][j] + u[i + 1][j] + u[i][j - 1] + u[i][j + 1]) / 4;
+                auto diff = fabs(w[i][j] - u[i][j]);
+                if (diff > globalDiff)
+                {
+                    globalDiff = diff;
+                }
             }
         }
-        double calc_loop_dur = omp_get_wtime() - calc_loop_start;
-        calc_loop_avg += calc_loop_dur;
-        if (calc_loop_dur < calc_loop_min)
-        {
-            calc_loop_min = calc_loop_dur;
-        }
 
-        if (calc_loop_dur > calc_loop_max)
-        {
-            calc_loop_max = calc_loop_dur;
-        }
         swap(w, u);
+
+        if (num_iter++ % 100 == 0)
+            printf("%5d, %0.6f\n", num_iter, globalDiff);
     }
-    //     for (;;)
+
+    end = omp_get_wtime();
+    // for (int i = N - 2; i < N - 1; i++)
+    // {
+    //     for (int j = 0; j < N; j++)
     //     {
-    //         num_iter++;
-    //         globalDiff = 0.0;
-    //         double calc_loop_start = omp_get_wtime();
-    // #pragma omp parallel default(none) private(i, j) firstprivate(u, w) reduction(max \
-//                                                                               : globalDiff)
-    //         {
-    // #pragma omp for schedule(static)
-    //             for (i = 1; i < N - 1; i++)
-    //             {
-    //                 for (j = 1; j < N - 1; j++)
-    //                 {
-    //                     w[i][j] = (u[i - 1][j] + u[i + 1][j] + u[i][j - 1] + u[i][j + 1]) / 4;
-
-    //                     if (fabs(w[i][j] - u[i][j]) > globalDiff)
-    //                     {
-    //                         globalDiff = fabs(w[i][j] - u[i][j]);
-    //                     }
-    //                 }
-    //             }
-    //         }
-    //         double calc_loop_dur = omp_get_wtime() - calc_loop_start;
-    //         calc_loop_avg += calc_loop_dur;
-    //         if (calc_loop_dur < calc_loop_min)
-    //         {
-    //             calc_loop_min = calc_loop_dur;
-    //         }
-
-    //         if (calc_loop_dur > calc_loop_max)
-    //         {
-    //             calc_loop_max = calc_loop_dur;
-    //         }
-
-    //         if (globalDiff <= EPSILON)
-    //             break;
-    //         swap(w, u);
-    //         // #pragma omp parallel default(none) private(i, j) firstprivate(u, w)
-    //         //         {
-    //         // #pragma omp for schedule(static)
-    //         //             for (i = 1; i < N - 1; i++)
-    //         //             {
-    //         //                 for (j = 1; j < N - 1; j++)
-    //         //                 {
-    //         //                     u[i][j] = w[i][j];
-    //         //                 }
-    //         //             }
-    //         //         }
+    //         printf("%6.2f ", u[i][j]);
     //     }
-
-    double end = omp_get_wtime();
+    //     putchar('\n');
+    // }
     printf("time ellapsed = %f\n", end - start);
     printf("num_iter %d\n", num_iter);
-    printf("calc_loop_min: %f\n", calc_loop_min);
-    printf("calc_loop_max: %f\n", calc_loop_max);
-    printf("calc_loop_avg: %f\n", calc_loop_avg / num_iter);
-
     delete[] u;
     delete[] w;
 }
@@ -257,9 +198,10 @@ void run_matrix_as_array()
 
 int main()
 {
-    //run_matrix_as_matrix();
+    run_matrix_as_matrix();
+
     printf("======================================\n");
-    run_matrix_as_array();
+    //run_matrix_as_array();
     printf("Solved\n");
 }
 

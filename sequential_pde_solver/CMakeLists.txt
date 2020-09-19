@@ -7,7 +7,7 @@ find_package(OpenMP REQUIRED)
 
 set(executable main.cpp)
 
-set(executable_name ${project_name})
+set(executable_name ${project_name}.exe)
 
 ### get name of current example
 add_executable(${executable_name} ${executable})

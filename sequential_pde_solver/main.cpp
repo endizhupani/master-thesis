@@ -2,12 +2,13 @@
 #include <math.h>
 #include <chrono>
 #include <array>
-
-#define N 10000000
+using namespace std;
+#define N 4000
 #define EPSILON 0.01
 
 void run_matrix_as_array()
 {
+
     std::array<int, N> myArray;
     for (int i = 0; i < N; i++)
     {
@@ -111,21 +112,10 @@ void run_matrix_as_array()
 void run_matrix_as_matrix()
 {
 
-    double globalDiff, mean;
+    double globalDiff = 500, mean;
     int i, j;
     auto u = new double[N][N];
-    // for (i = 0; i < N; i++)
-    // {
-    //     u[i] = new double[N];
-    // }
-
     auto w = new double[N][N];
-    // for (i = 0; i < N; i++)
-    // {
-    //     w[i] = new double[N];
-    // }
-
-    //double **tmp;
 
     mean = 0.0;
     for (i = 0; i < N; i++)
@@ -149,41 +139,24 @@ void run_matrix_as_matrix()
     double calc_loop_min = 1000000;
     double calc_loop_max = 0;
     double calc_loop_avg = 0;
-    for (;;)
+    while (globalDiff > EPSILON && num_iter < 1)
     {
-        num_iter++;
         globalDiff = 0.0;
 
-        auto calc_loop_start = std::chrono::high_resolution_clock::now();
-        for (i = 1; i < N - 1; i++)
+        for (int i = 1; i < N - 1; i++)
         {
-            for (j = 1; j < N - 1; j++)
+
+            for (int j = 1; j < N - 1; j++)
             {
                 w[i][j] = (u[i - 1][j] + u[i + 1][j] + u[i][j - 1] + u[i][j + 1]) / 4;
-
-                if (fabs(w[i][j] - u[i][j]) > globalDiff)
-                {
-                    globalDiff = fabs(w[i][j] - u[i][j]);
-                }
+                globalDiff = max(globalDiff, fabs(w[i][j] - u[i][j]));
             }
         }
-        auto calc_loop_end = std::chrono::high_resolution_clock::now();
-        std::chrono::duration<double> calc_loop_elapsed = calc_loop_end - calc_loop_start;
-        if (calc_loop_elapsed.count() > calc_loop_max)
-        {
-            calc_loop_max = calc_loop_elapsed.count();
-        }
 
-        if (calc_loop_elapsed.count() < calc_loop_min)
-        {
-            calc_loop_min = calc_loop_elapsed.count();
-        }
+        swap(w, u);
 
-        calc_loop_avg += calc_loop_elapsed.count();
-
-        if (globalDiff <= EPSILON)
-            break;
-        std::swap(w, u);
+        if (num_iter++ % 100 == 0)
+            printf("%5d, %0.6f\n", num_iter, globalDiff);
     }
 
     auto full_calc_finish = std::chrono::high_resolution_clock::now();
@@ -192,32 +165,13 @@ void run_matrix_as_matrix()
     std::chrono::duration<double> elapsed = full_calc_finish - full_calc_start;
     printf("full_calc_time: %f\n", elapsed.count());
 
-    printf("calc_loop_min: %f\n", calc_loop_min);
-    printf("calc_loop_max: %f\n", calc_loop_max);
-    printf("calc_loop_avg: %f\n", calc_loop_avg / num_iter);
-    // for(i = 0; i < N; i++){
-    // for (j = 0; j < N; j++) {
-    //     printf("%6.2f ", u[i][j]);
-    // }
-    // putchar('\n');
-
-    // for (i = 0; i < N; i++)
-    // {
-    //     delete[] u[i];
-    // }
-
     delete[] u;
-
-    // for (i = 0; i < N; i++)
-    // {
-    //     delete[] w[i];
-    // }
 
     delete[] w;
 }
 
 int main()
 {
-    //run_matrix_as_matrix();
-    run_matrix_as_array();
+    run_matrix_as_matrix();
+    //run_matrix_as_array();
 }
