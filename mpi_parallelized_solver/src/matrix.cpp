@@ -21,14 +21,45 @@
  */
 
 #include "matrix.h"
-Matrix::Matrix(int halo_size, int width, int height, int processor_count)
+
+Matrix::Matrix(int halo_size, int width, int height)
 {
     this->halo_size_ = halo_size;
     this->matrix_width_ = width;
     this->matrix_height_ = height;
-    this->proc_count_ = processor_count;
 }
 
-void Matrix::Init(double value)
+MPI_Comm Matrix::GetCartesianCommunicator()
 {
+    return this->cartesian_communicator_;
+}
+
+void Matrix::Init(double value, int argc, char *argv[])
+{
+    this->Init(value, value, value, value, value, argc, argv);
+}
+
+void Matrix::Init(double inner_value, double left_border_value, double right_border_value, double bottom_border_value, double top_border_value, int argc, char *argv[])
+{
+    if (!is_initialized_)
+    {
+        return;
+    }
+}
+
+void Matrix::InitializeMPI(int argc, char *argv[])
+{
+    if (is_initialized_)
+    {
+        // TODO(Endi): Replace this with a custom exception
+        throw new std::logic_error("The MPI context is already initialized");
+    }
+    MPI_Init(&argc, &argv);
+    MPI_Comm_size(MPI_COMM_WORLD, &proc_count_);
+    int n_dim = 2;
+    int periods[2] = {false, false};
+    int dims[2];
+    MPI_Dims_create(proc_count_, 2, dims);
+    MPI_Cart_create(MPI_COMM_WORLD, n_dim, dims, periods, false, &this->cartesian_communicator_);
+    MPI_Comm_rank(MPI_COMM_WORLD, &proc_id_);
 }
