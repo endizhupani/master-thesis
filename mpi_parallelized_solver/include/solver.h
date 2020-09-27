@@ -1,6 +1,7 @@
 /**
- * common.h 
- * Defines common data structures
+ * solver.h
+ * 
+ * File with the solver context for the Poisson problem.
  * ------------------------------------------------------
  * Copyright (c) 2020 Endi Zhupani
  * 
@@ -20,31 +21,14 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef COMMON_H
-#define COMMON_H
 /**
- * @brief The type of the partition neighbour
+ * @brief Solves the Laplace problem with the Jacobi Algorithm.
  * 
  */
-enum PartitionNeighbourType
-{
-    LEFT_NEIGHTBOUR,
-    RIGHT_NEIGHBOUR,
-    BOTTOM_NEIGHBOUR,
-    TOP_NEIGHBOUR
-};
-
-/**
- * @brief The neighbour of the partition. Identified by the processor number and the position relative to the target
- * 
- */
-struct PartitionNeighbour
+class LaplaceSolver
 {
 public:
-    // The id of the processor that holds this neighbour
-    int id;
-    // Defines the type which determines the position of the neighbor
-    enum PartitionNeighbourType type;
+    LaplaceSolver();
+    ~LaplaceSolver();
+    void LogResults();
 };
-
-#endif // !COMMON_H

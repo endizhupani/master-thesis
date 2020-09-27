@@ -21,99 +21,92 @@
  */
 
 #include "common.h"
+#include "base_matrix.h"
 #include "mpi.h"
 #ifndef MATRIX_H
 #define MATRIX_H
-
-/**
+namespace pde_solver::data::cpu_distr
+{
+    /**
  * @brief Class that defines a distributed matrix that is partitioned in blocks and distributed with MPI to multiple processors
  * 
  */
-class Matrix
-{
-private:
-    // array that holds the left border of the partition
-    double *partition_left_border_;
+    class Matrix : public common::BaseMatrix
+    {
+    private:
+        // points that are used by the stencil calcuation of the points in the left border of the partition
+        double *left_ghost_points_;
 
-    // array that holds the right border of the partition
-    double *partition_right_border_;
+        // points taht are used by the stencil calcuation of the points in the right border of the partition
+        double *right_ghost_points_;
 
-    // points that are used by the stencil calcuation of the points in the left border of the partition
-    double *left_ghost_points_;
+        // number of rows or columns that will serve as the halo of the partition
+        int halo_size_;
 
-    // points taht are used by the stencil calcuation of the points in the right border of the partition
-    double *right_ghost_points_;
+        // width of the current partition
+        int partition_width_;
 
-    // number of rows or columns that will serve as the halo of the partition
-    int halo_size_;
+        // height of the current partition
+        int partition_height_;
 
-    // global matrix width
-    int matrix_width_;
+        // number of the process that is working with the current partition
+        int proc_id_;
 
-    // global matrix height
-    int matrix_height_;
+        // number of processors being used by this matrix
+        int proc_count_;
 
-    // width of the current partition
-    int partition_width_;
+        // Number of partitions along the y-dimension
+        int y_partitions_;
 
-    // height of the current partition
-    int partition_height_;
+        // Number of partitions along the x-dimension
+        int x_partitions_;
 
-    // number of the process that is working with the current partition
-    int proc_id_;
+        // Neighbours on the top, right, bottom and left of the partition
+        PartitionNeighbour neighbours[4];
 
-    // number of processors being used by this matrix
-    int proc_count_;
+        // Coordnates of the partition in the cartesian topology
+        int partition_coords[2];
 
-    // Number of partitions along the y-dimension
-    int y_partitions_;
+        // Indicates whether the distributed matrix has been initialized or not.
+        bool is_initialized_;
 
-    // Number of partitions along the x-dimension
-    int x_partitions_;
+        // Iteration when the global reduction was performed for the last time.
+        int last_global_reduction_iteration_;
 
-    // Neighbours on the top, right, bottom and left of the partition
-    PartitionNeighbour neighbours[4];
+        // Communicator object that uses a cartesian graph topology
+        MPI_Comm cartesian_communicator_;
 
-    // Indicates whether the distributed matrix has been initialized or not.
-    bool is_initialized_;
+        // The max difference calculated after a Jacobian sweep operation
+        double current_max_difference_;
 
-    // Iteration when the global reduction was performed for the last time.
-    int last_global_reduction_iteration_;
-
-    // Communicator object that uses a cartesian graph topology
-    MPI_Comm cartesian_communicator_;
-
-    // The max difference calculated after a Jacobian sweep operation
-    double current_max_difference_;
-
-    /**
+        /**
      * @brief Initializes the MPI context
      * 
      * @param argc Number of arguments provided by the user
      * @param argv Arguments provided by the user
      */
-    void InitializeMPI(int argc, char *argv[]);
+        void InitializeMPI(int argc, char *argv[]);
 
-public:
-    /**
+    public:
+        /**
      * @brief Construct a new Matrix object
      * 
      * @param halo_size size of the halo around partitions this is in number of columns or rows.
      * @param width width of the global matrix
      * @param height height of the global matrix
      */
-    Matrix(int halo_size, int width, int height);
+        Matrix(int halo_size, int width, int height);
 
-    /**
+        /**
      * @brief Initializes the global matrix and a new MPI context
      * 
      * @param value Value to assing to all elements of the matrix
      * @param argc Number of arguments provided by the user
      * @param argv Arguments provided by the user
      */
-    void Init(double value, int argc, char *argv[]);
+        void Init(double value, int argc, char *argv[]);
 
-    /**
+        /**
      * @brief Initializes the global matrix and a new MPI context. This method assigns custom values to the borders of the matrix
      * 
      * @param inner_value Value to be assigned to non-bordering elements of the global matrix
@@ -124,43 +117,58 @@ public:
      * @param argc Number of arguments provided by the user
      * @param argv Arguments provided by the user
      */
-    void Init(double inner_value, double left_border_value, double right_border_value, double bottom_border_value, double top_border_value, int argc, char *argv[]);
+        void Init(double inner_value, double left_border_value, double right_border_value, double bottom_border_value, double top_border_value, int argc, char *argv[]);
 
-    /**
+        /**
      * @brief Sends all the borders of the partition to the corresponding neighbors and gets the halo values from these neighbors
      * 
      */
-    void AllNeighbourExchange();
+        void AllNeighbourExchange();
 
-    /**
+        /**
      * @brief Sends the border of the partition to the specified neighbor and gets the halo values from that neighbor
      * 
      * @param exchange_target Target neighbor
      */
-    void NeighbourExchange(PartitionNeighbour exchange_target);
+        void NeighbourExchange(PartitionNeighbour exchange_target);
 
-    /**
+        /**
      * @brief Performs a Jacobian sweep of the current partition
      * 
      * @return double Maximum difference between the new and the old values
      */
-    double LocalSweep();
+        double LocalSweep();
 
-    /**
+        /**
      * @brief Gets the global max difference by performing a reduction operation for all processors
      * 
      * @return double Global max difference
      */
-    double GlobalDifference();
+        double GlobalDifference();
+
+        /**
+     * @brief Prints information about the current partition.
+     * 
+     */
+        void PrintPartitionInfo();
+
+        /**
+ * @brief Gets the full set of points from the global matrix. Note that this will gather all points from all processes in the cartesian grid.
+ * 
+ * @return double* 
+ */
+        double *GetAllPoints();
 
 #pragma region Getters and Setters
 
-    /**
+        /**
      * @brief Get the Cartesian Communicator object
      * 
      * @return MPI_Comm
      */
-    MPI_Comm GetCartesianCommunicator();
+        MPI_Comm GetCartesianCommunicator();
 #pragma endregion
-};
+    };
+
+} // namespace pde_solver::data::cpu_distr
 #endif // !MATRIX_H

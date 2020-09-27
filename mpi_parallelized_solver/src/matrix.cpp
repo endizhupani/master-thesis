@@ -22,44 +22,67 @@
 
 #include "matrix.h"
 
-Matrix::Matrix(int halo_size, int width, int height)
+namespace pde_solver::data::cpu_distr
 {
-    this->halo_size_ = halo_size;
-    this->matrix_width_ = width;
-    this->matrix_height_ = height;
-}
-
-MPI_Comm Matrix::GetCartesianCommunicator()
-{
-    return this->cartesian_communicator_;
-}
-
-void Matrix::Init(double value, int argc, char *argv[])
-{
-    this->Init(value, value, value, value, value, argc, argv);
-}
-
-void Matrix::Init(double inner_value, double left_border_value, double right_border_value, double bottom_border_value, double top_border_value, int argc, char *argv[])
-{
-    if (!is_initialized_)
+    Matrix::Matrix(int halo_size, int width, int height) : pde_solver::data::common::BaseMatrix(width, height)
     {
-        return;
+        this->halo_size_ = halo_size;
     }
-}
 
-void Matrix::InitializeMPI(int argc, char *argv[])
-{
-    if (is_initialized_)
+    MPI_Comm Matrix::GetCartesianCommunicator()
     {
-        // TODO(Endi): Replace this with a custom exception
-        throw new std::logic_error("The MPI context is already initialized");
+        return this->cartesian_communicator_;
     }
-    MPI_Init(&argc, &argv);
-    MPI_Comm_size(MPI_COMM_WORLD, &proc_count_);
-    int n_dim = 2;
-    int periods[2] = {false, false};
-    int dims[2];
-    MPI_Dims_create(proc_count_, 2, dims);
-    MPI_Cart_create(MPI_COMM_WORLD, n_dim, dims, periods, false, &this->cartesian_communicator_);
-    MPI_Comm_rank(MPI_COMM_WORLD, &proc_id_);
-}
+
+    void Matrix::Init(double value, int argc, char *argv[])
+    {
+        this->Init(value, value, value, value, value, argc, argv);
+    }
+
+    void Matrix::Init(double inner_value, double left_border_value, double right_border_value, double bottom_border_value, double top_border_value, int argc, char *argv[])
+    {
+        if (!is_initialized_)
+        {
+            this->InitializeMPI(argc, argv);
+        }
+    }
+
+    void Matrix::InitializeMPI(int argc, char *argv[])
+    {
+        if (is_initialized_)
+        {
+            // TODO(endizhupani@uni-muenster.de): Replace this with a custom exception
+            throw new std::logic_error("The MPI context is already initialized");
+        }
+        MPI_Init(&argc, &argv);
+        MPI_Comm_size(MPI_COMM_WORLD, &proc_count_);
+        int n_dim = 2;
+        int periods[2] = {false, false};
+        int dims[2];
+        MPI_Dims_create(proc_count_, 2, dims);
+        MPI_Cart_create(MPI_COMM_WORLD, n_dim, dims, periods, false, &this->cartesian_communicator_);
+        MPI_Comm_rank(this->GetCartesianCommunicator(), &proc_id_);
+
+        // Fetch the coordinates of the current partition
+        MPI_Cart_coords(this->GetCartesianCommunicator(), this->proc_id_, 2, this->partition_coords);
+
+        this->neighbours[0].type = PartitionNeighbourType::TOP_NEIGHBOUR;
+        MPI_Cart_shift(this->GetCartesianCommunicator(), 1, 1, &proc_id_, &this->neighbours[0].id);
+
+        this->neighbours[1].type = PartitionNeighbourType::RIGHT_NEIGHBOUR;
+        MPI_Cart_shift(this->GetCartesianCommunicator(), 0, 1, &proc_id_, &this->neighbours[1].id);
+
+        this->neighbours[2].type = PartitionNeighbourType::BOTTOM_NEIGHBOUR;
+        MPI_Cart_shift(this->GetCartesianCommunicator(), 1, -1, &proc_id_, &this->neighbours[2].id);
+
+        this->neighbours[3].type = PartitionNeighbourType::LEFT_NEIGHTBOUR;
+        MPI_Cart_shift(this->GetCartesianCommunicator(), 0, -1, &proc_id_, &this->neighbours[3].id);
+    }
+
+    double *Matrix::GetAllPoints()
+    {
+        throw "Not implemented";
+        // TODO (endizhupani@uni-muenster.de): To implment this, first the left and right column of the partition need to be merged into one array and then an all gather operation should be performed only on the root process.
+        //return this->inner_points_;
+    }
+} // namespace pde_solver::data::cpu_distr

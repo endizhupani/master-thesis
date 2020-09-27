@@ -15,7 +15,7 @@ int getChunkSize(int arrayCount, int numElPerLine);
 
 void run_matrix_as_matrix()
 {
-    Matrix m(1, 5, 5, 4);
+    //Matrix m(1, 16, 16);
     printf("Running on max %d threads.\nMatrix is stored as a matrix.\nMatrix size: %d rows by %d columns\n", N_THREADS, N, N);
     omp_set_num_threads(N_THREADS);
 

@@ -1,6 +1,6 @@
 /**
- * common.h 
- * Defines common data structures
+ * base_matrix.cpp
+ * Definition for the base matrix class
  * ------------------------------------------------------
  * Copyright (c) 2020 Endi Zhupani
  * 
@@ -20,31 +20,14 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef COMMON_H
-#define COMMON_H
-/**
- * @brief The type of the partition neighbour
- * 
- */
-enum PartitionNeighbourType
-{
-    LEFT_NEIGHTBOUR,
-    RIGHT_NEIGHBOUR,
-    BOTTOM_NEIGHBOUR,
-    TOP_NEIGHBOUR
-};
+#include "base_matrix.h"
+#include <iostream>
 
-/**
- * @brief The neighbour of the partition. Identified by the processor number and the position relative to the target
- * 
- */
-struct PartitionNeighbour
+namespace pde_solver::data::common
 {
-public:
-    // The id of the processor that holds this neighbour
-    int id;
-    // Defines the type which determines the position of the neighbor
-    enum PartitionNeighbourType type;
-};
-
-#endif // !COMMON_H
+    BaseMatrix::BaseMatrix(int width, int height)
+    {
+        this->matrix_width_ = width;
+        this->matrix_height_ = height;
+    }
+} // namespace pde_solver::data::common
