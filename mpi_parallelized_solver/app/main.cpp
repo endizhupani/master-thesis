@@ -198,13 +198,17 @@ void run_matrix_as_array()
     free(u);
 }
 
-int main()
+int main(int argc, char *argv[])
 {
-    run_matrix_as_matrix();
+    //run_matrix_as_matrix();
 
-    printf("======================================\n");
-    //run_matrix_as_array();
-    printf("Solved\n");
+    pde_solver::data::cpu_distr::Matrix m(1, 10, 10);
+    m.Init(5, 2, 2, 0, 2, argc, argv);
+    m.PrintMatrixInfo();
+    m.Finalize();
+    // printf("======================================\n");
+    // //run_matrix_as_array();
+    // printf("Solved\n");
 }
 
 int getChunkSize(int arrayCount, int numElPerLine)

@@ -30,4 +30,8 @@ namespace pde_solver::data::common
         this->matrix_width_ = width;
         this->matrix_height_ = height;
     }
+
+    BaseMatrix::~BaseMatrix()
+    {
+    }
 } // namespace pde_solver::data::common

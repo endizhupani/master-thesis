@@ -19,7 +19,9 @@
  * DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
-
+#include "mpi.h"
+#include <string>
+#include <iostream>
 #ifndef COMMON_H
 #define COMMON_H
 /**
@@ -45,6 +47,16 @@ public:
     int id;
     // Defines the type which determines the position of the neighbor
     enum PartitionNeighbourType type;
+
+    std::string GetNeighborId()
+    {
+        if (id == MPI_PROC_NULL)
+        {
+            return "NULL";
+        }
+
+        return std::to_string(id);
+    }
 };
 
 #endif // !COMMON_H
