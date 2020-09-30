@@ -1,6 +1,0 @@
-{
-    "licenser.license": "Custom",
-    "licenser.projectName": "MPI Parallelized Solver",
-    "licenser.disableAutoHeaderInsertion": true,
-    "licenser.customHeaderFile": "/home/endizhupani/master_thesis/code/master-thesis/mpi_parallelized_solver/license/license.txt"
-}
