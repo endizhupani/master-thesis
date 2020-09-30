@@ -1,4 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
+set(CMAKE_VERBOSE_MAKEFILE ON)
 set(project_name sequential_pde_solver)
 project(${project_name})
 

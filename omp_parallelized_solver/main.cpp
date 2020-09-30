@@ -8,7 +8,6 @@ using namespace std;
 #define EPSILON 0.01
 #define N_THREADS 8
 #define MAX_ITER 5000
-//#define CACHE_LINE_SIZE sysconf(_SC_LEVEL1_DCACHE_LINESIZE)
 
 int getChunkSize(int arrayCount, int numElPerLine);
 
