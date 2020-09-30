@@ -72,84 +72,11 @@ void run_matrix_as_array()
     std::chrono::duration<double> elapsed = full_calc_finish - full_calc_start;
     printf("full_calc_time: %f\n", elapsed.count());
 
-    // printf("calc_loop_min: %f\n", calc_loop_min);
-    // printf("calc_loop_max: %f\n", calc_loop_max);
-    // printf("calc_loop_avg: %f\n", calc_loop_avg / num_iter);
-
-    // //        for(i = 0; i < N; i++){
-    // //        for (j = 0; j < N; j++) {
-    // //            printf("%6.2f ", u[i][j]);
-    // //        }
-    // //        putchar('\n');
-    // //    }
-
     delete[] u;
-    delete[] w;
-}
-
-void run_matrix_as_matrix()
-{
-
-    double globalDiff = 500, mean;
-    int i, j;
-    auto u = new double[N][N];
-    auto w = new double[N][N];
-
-    mean = 0.0;
-    for (i = 0; i < N; i++)
-    {
-        u[i][0] = w[i][0] = u[i][N - 1] = w[i][N - 1] = u[0][i] = w[0][i] = 100;
-        u[N - 1][i] = w[N - 1][i] = 0;
-        mean += u[i][0] + u[i][N - 1] + u[0][i] + u[N - 1][i];
-    }
-
-    mean /= (4 * N);
-
-    for (i = 1; i < N - 1; i++)
-    {
-        for (j = 1; j < N - 1; j++)
-        {
-            u[i][j] = mean;
-        }
-    }
-    auto full_calc_start = std::chrono::high_resolution_clock::now();
-    int num_iter = 0;
-    double calc_loop_min = 1000000;
-    double calc_loop_max = 0;
-    double calc_loop_avg = 0;
-    while (globalDiff > EPSILON && num_iter < 1)
-    {
-        globalDiff = 0.0;
-
-        for (int i = 1; i < N - 1; i++)
-        {
-
-            for (int j = 1; j < N - 1; j++)
-            {
-                w[i][j] = (u[i - 1][j] + u[i + 1][j] + u[i][j - 1] + u[i][j + 1]) / 4;
-                globalDiff = max(globalDiff, fabs(w[i][j] - u[i][j]));
-            }
-        }
-
-        swap(w, u);
-
-        if (num_iter++ % 100 == 0)
-            printf("%5d, %0.6f\n", num_iter, globalDiff);
-    }
-
-    auto full_calc_finish = std::chrono::high_resolution_clock::now();
-    printf("Results with matrix stored as array of pointers: \n");
-    printf("num_iter: %d\n", num_iter);
-    std::chrono::duration<double> elapsed = full_calc_finish - full_calc_start;
-    printf("full_calc_time: %f\n", elapsed.count());
-
-    delete[] u;
-
     delete[] w;
 }
 
 int main()
 {
-    //run_matrix_as_matrix();
     run_matrix_as_array();
 }

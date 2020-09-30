@@ -10,80 +10,6 @@ using namespace std;
 #define MAX_ITER 5000
 
 int getChunkSize(int arrayCount, int numElPerLine);
-
-void run_matrix_as_matrix()
-{
-    printf("Running on max %d threads.\nMatrix is stored as a matrix.\nMatrix size: %d rows by %d columns\n", N_THREADS, N, N);
-    omp_set_num_threads(N_THREADS);
-
-    double globalDiff = 500;
-    double mean = 0.0, start, end;
-    auto u = new double[N][N];
-    auto w = new double[N][N];
-    double *tmp;
-
-#pragma omp parallel for default(none) shared(u, w) schedule(static) reduction(+ \
-                                                                               : mean)
-    for (int i = 0; i < N; i++)
-    {
-        u[i][0] = w[i][0] = u[i][N - 1] = w[i][N - 1] = u[0][i] = w[0][i] = 100;
-        u[N - 1][i] = w[N - 1][i] = 0;
-
-        mean += u[i][0] + u[i][N - 1] + u[0][i] + u[N - 1][i];
-    }
-
-    mean /= (4 * N);
-
-#pragma omp parallel for default(none) shared(u) firstprivate(mean) schedule(static)
-    for (int i = 1; i < N - 1; i++)
-    {
-        for (int j = 1; j < N - 1; j++)
-        {
-            u[i][j] = mean;
-        }
-    }
-
-    start = omp_get_wtime();
-    int num_iter = 0;
-
-    while (globalDiff > EPSILON && num_iter < MAX_ITER)
-    {
-        globalDiff = 0.0;
-
-#pragma omp parallel for reduction(max \
-                                   : globalDiff) schedule(static)
-        for (int i = 1; i < N - 1; i++)
-        {
-#pragma omp simd
-            for (int j = 1; j < N - 1; j++)
-            {
-                w[i][j] = 1; //(u[i - 1][j] + u[i + 1][j] + u[i][j - 1] + u[i][j + 1]) / 4;
-                auto diff = fabs(w[i][j] - u[i][j]);
-                if (diff > globalDiff)
-                {
-                    globalDiff = diff;
-                }
-            }
-        }
-
-        swap(w, u);
-        num_iter++;
-    }
-
-    end = omp_get_wtime();
-    // for (int i = N - 2; i < N - 1; i++)
-    // {
-    //     for (int j = 0; j < N; j++)
-    //     {
-    //         printf("%6.2f ", u[i][j]);
-    //     }
-    //     putchar('\n');
-    // }
-    printf("time ellapsed = %f\n", end - start);
-    printf("num_iter %d\n", num_iter);
-    delete[] u;
-    delete[] w;
-}
 void run_matrix_as_array()
 {
     int i, j;
@@ -170,9 +96,6 @@ void run_matrix_as_array()
 
 int main()
 {
-    //run_matrix_as_matrix();
-
-    //printf("======================================\n");
     run_matrix_as_array();
 }
 
