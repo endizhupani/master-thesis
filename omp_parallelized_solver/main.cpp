@@ -4,7 +4,7 @@
 #include <cstdlib>
 #include "cache_helpers.h"
 using namespace std;
-#define N 4000
+#define N 10
 #define EPSILON 0.01
 #define N_THREADS 8
 #define MAX_ITER 5000
@@ -71,14 +71,14 @@ void run_matrix_as_matrix()
     }
 
     end = omp_get_wtime();
-    // for (int i = N - 2; i < N - 1; i++)
-    // {
-    //     for (int j = 0; j < N; j++)
-    //     {
-    //         printf("%6.2f ", u[i][j]);
-    //     }
-    //     putchar('\n');
-    // }
+    for (int i = N - 2; i < N - 1; i++)
+    {
+        for (int j = 0; j < N; j++)
+        {
+            printf("%6.2f ", u[i][j]);
+        }
+        putchar('\n');
+    }
     printf("time ellapsed = %f\n", end - start);
     printf("num_iter %d\n", num_iter);
     delete[] u;
@@ -156,12 +156,14 @@ void run_matrix_as_array()
     double end = omp_get_wtime();
     printf("time ellapsed = %f\n", end - start);
     printf("num_iter %d\n", num_iter);
-    //    for(int i = 0; i < N; i++){
-    //        for (int j = 0; j < N; j++) {
-    //            printf("%6.2f ", u[i*N + j]);
-    //        }
-    //        putchar('\n');
-    //    }
+    for (int i = 0; i < N; i++)
+    {
+        for (int j = 0; j < N; j++)
+        {
+            printf("%6.2f ", u[i * N + j]);
+        }
+        putchar('\n');
+    }
     // delete[] u;
     // delete[] w;
     free(w);

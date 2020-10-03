@@ -79,8 +79,19 @@ namespace pde_solver::data::cpu_distr
       // The max difference calculated after a Jacobian sweep operation
       double current_max_difference_;
 
-      // Number of processes in each dimension. Will be used to determine the width and height of each partition.
+      // Number of processes in each dimension. The first element determines the number processes along the vertical dimension the second, the number of processes along the horizontal dimension.
       int processes_per_dimension_[2];
+
+      int right_grid_border_coord;
+      int left_grid_border_coord;
+      int bottom_grid_border_coord;
+      int top_grid_border_coord;
+
+      // Pointer to the final row of inner_data
+      double *bottom_ghost;
+
+      // Pointer to the first row of the inner_data. Technically inner_data can be used with the same result but this was supplied for completeness.
+      double *top_ghost;
 
       /**
      * @brief Initializes the MPI context
@@ -91,12 +102,33 @@ namespace pde_solver::data::cpu_distr
       void InitializeMPI(int argc, char *argv[]);
 
       /**
- * @brief Gets the rank of the process by the coordinates in the cartesian grid.
- * 
- * @param coords 
- * @param rank 
- */
+       * @brief Gets the rank of the process by the coordinates in the cartesian grid.
+       * 
+       * @param coords 
+       * @param rank 
+       */
       void RankByCoordinates(const int coords[2], int *rank);
+
+      /**
+       * @brief Initializes the left border of the partition and left ghost points that are part of the halo. 
+       * 
+       * @param inner_value Inner value of the global matrix. Needed because on inner partitions the left border of the partition will be the inner value.
+       * @param left_border_value 
+       * @param right_border_value 
+       * @param bottom_border_value 
+       * @param top_border_value 
+       */
+      void InitLeftBorderAndGhost(double inner_value, double left_border_value, double bottom_border_value, double top_border_value);
+
+      /**
+ * @brief 
+ * 
+ * @param inner_value 
+ * @param right_border_value 
+ * @param bottom_border_value 
+ * @param top_border_value 
+ */
+      void InitRightBorderAndGhost(double inner_value, double right_border_value, double bottom_border_value, double top_border_value);
 
    public:
       /**
@@ -164,13 +196,45 @@ namespace pde_solver::data::cpu_distr
       void PrintMatrixInfo();
 
       /**
+       * @brief Prints the current partition data
+       * 
+       */
+      void PrintPartitionData();
+
+      /**
+       * @brief Prints all the partitions in this matrix
+       * 
+       */
+      void PrintAllPartitions();
+
+      /**
  * @brief Gets the full set of points from the global matrix. Note that this will gather all points from all processes in the cartesian grid.
  * 
  * @return double* 
  */
-      double *AsembleMatrix();
+      double *AssembleMatrix();
+
+      /**
+ * @brief Puts together the data in the partition
+ * 
+ * @return double* 
+ */
+      double *AssemblePartition();
+
+      bool IsTopBorder();
+      bool IsBottomBorder();
+      bool IsLeftBorder();
+      bool IsRightBorder();
 
       void Finalize();
+
+      /**
+ * @brief Get the Partition Coordinates for the processor with the specified rank
+ * 
+ * @param rank 
+ * @return int* 
+ */
+      int *GetPartitionCoordinates(int rank);
 
 #pragma region Getters and Setters
 

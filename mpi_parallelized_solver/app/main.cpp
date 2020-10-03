@@ -6,7 +6,7 @@
 #include "matrix.h"
 using namespace std;
 #define N 4000
-#define EPSILON -5
+#define EPSILON 0.01
 #define N_THREADS 8
 #define MAX_ITER 1815
 //#define CACHE_LINE_SIZE sysconf(_SC_LEVEL1_DCACHE_LINESIZE)
@@ -201,10 +201,26 @@ void run_matrix_as_array()
 int main(int argc, char *argv[])
 {
     //run_matrix_as_matrix();
+    int matrix_width = 10, matrix_height = 10;
+    pde_solver::data::cpu_distr::Matrix m(1, matrix_width, matrix_height);
 
-    pde_solver::data::cpu_distr::Matrix m(1, 10, 10);
-    m.Init(5, 2, 2, 0, 2, argc, argv);
-    m.PrintMatrixInfo();
+    m.Init(5, 1, 2, 4, 3, argc, argv);
+
+    //m.PrintMatrixInfo();
+    m.PrintAllPartitions();
+    double *temp = m.AssembleMatrix();
+    if (temp)
+    {
+        for (int i = 0; i < matrix_height; i++)
+        {
+            for (int j = 0; j < matrix_width; j++)
+            {
+                printf("%6.2f ", temp[i * matrix_width + j]);
+            }
+            putchar('\n');
+        }
+        delete[] temp;
+    }
     m.Finalize();
     // printf("======================================\n");
     // //run_matrix_as_array();
