@@ -210,9 +210,10 @@ namespace pde_solver::data::cpu_distr
           /**
  * @brief Gets the full set of points from the global matrix. Note that this will gather all points from all processes in the cartesian grid.
  * 
- * @return double* 
  */
-          double *AssembleMatrix();
+          void ShowMatrix();
+
+          void Synchronize();
 
           /**
  * @brief Puts together the data in the partition

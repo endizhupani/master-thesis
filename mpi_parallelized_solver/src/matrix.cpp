@@ -314,7 +314,12 @@ namespace pde_solver::data::cpu_distr
         delete[] left_border_;
         delete[] right_border_;
         delete[] inner_points_;
-        MPI_Finalize();
+        MPI_Barrier(this->GetCartesianCommunicator());
+        int result = MPI_Finalize();
+        if (this->proc_id_ == 0)
+        {
+            printf("MPi Finalize, process %d, return code: %d\n", this->proc_id_, result);
+        }
     }
 
     double Matrix::LocalSweep()
@@ -322,85 +327,50 @@ namespace pde_solver::data::cpu_distr
         throw "Not implemented";
     }
 
-    double *Matrix::AssembleMatrix()
+    void Matrix::ShowMatrix()
     {
         MPI_Barrier(this->GetCartesianCommunicator());
-        // Holds the data returned by each processor. Processor with rank k places the data in row k-1 of the matrix.
-        double **proc_buffers = new double *[this->proc_count_];
 
-        proc_buffers[this->proc_id_] = this->AssemblePartition();
-        double *matrix;
-        int req_count = (this->proc_count_ - 1) * 2; // 1 send request for each of the n-1 non-root processors and n-1 receives on the root processor.
-        MPI_Request requests[req_count];
-        for (int i = 0; i < req_count; i++)
+        double *partition_data = this->AssemblePartition();
+        double *buffer, *matrix;
+        if (this->proc_id_ == 0)
         {
-
-            requests[i] = MPI_REQUEST_NULL;
+            buffer = new double[this->matrix_height_ * this->matrix_width_];
+            matrix = new double[this->matrix_height_ * this->matrix_width_];
         }
 
-        // TODO (endizhupani@uni-muenster.de): Fetch everything from other partitions
-
-        // Data have to be retrieved form each separate processor.
+        MPI_Gather(partition_data, this->partition_height_ * this->partition_width_, MPI_DOUBLE, buffer, this->partition_height_ * this->partition_width_, MPI_DOUBLE, 0, this->GetCartesianCommunicator());
+        delete[] partition_data;
         if (this->proc_id_ != 0)
         {
-            MPI_Isend(proc_buffers[this->proc_id_], this->partition_width_ * this->partition_height_, MPI_DOUBLE, 0, 0, this->GetCartesianCommunicator(), &requests[this->proc_id_ - 1]);
+            return;
         }
 
-        // if (this->proc_id_ != 0)
-        // {
-        //     delete[] proc_buffers[this->proc_id_];
-        // }
-
-        if (this->proc_id_ == 0)
+        for (int i = 0; i < this->proc_count_; i++)
         {
-            for (int proc = 1; proc < this->proc_count_; proc++)
+
+            int coords[2];
+            this->GetPartitionCoordinates(i, coords);
+            for (int row = 0; row < this->partition_height_; row++)
             {
-                if (!(proc == this->proc_id_))
-                {
-                    continue;
-                }
-
-                auto el_count = this->partition_width_ * this->partition_height_;
-
-                proc_buffers[proc] = new double[el_count];
-
-                MPI_Irecv(proc_buffers[proc], el_count, MPI_DOUBLE, 0, MPI_ANY_TAG, this->GetCartesianCommunicator(), &requests[req_count - this->proc_id_]);
+                int matrix_row = coords[0] * this->partition_height_ + row;
+                int start_in_row = coords[1] * partition_width_;
+                int start_of_this_process = i * this->partition_width_ * this->partition_height_;
+                std::copy(buffer + start_of_this_process + row * this->partition_width_, buffer + start_of_this_process + row * this->partition_width_ + this->partition_width_, matrix + (matrix_row * this->matrix_width_) + start_in_row);
             }
         }
 
-        MPI_Status statuses[this->proc_count_ - 1];
-        MPI_Waitall(this->proc_count_ - 1, requests, statuses);
-        MPI_Barrier(this->GetCartesianCommunicator());
-        printf("GOT HERE\n\n");
-        if (this->proc_id_ == 0)
+        delete[] buffer;
+        for (int i = 0; i < this->matrix_height_; i++)
         {
-            matrix = new double[this->matrix_height_ * this->matrix_width_];
-
-            for (int i = 0; i < this->proc_count_; i++)
+            for (int j = 0; j < this->matrix_width_; j++)
             {
-
-                int coords[2];
-                this->GetPartitionCoordinates(i, coords);
-
-                for (int row = 0; row < this->partition_height_; row++)
-                {
-
-                    int matrix_row = coords[0] * this->partition_height_ + row;
-
-                    int start_in_row = coords[1] * partition_width_;
-                    printf("GOT HERE: (%d, %d)\n\n", i, row);
-                    fflush(stdout);
-                    std::copy(proc_buffers[i] + row * this->partition_width_, proc_buffers[i] + row * this->partition_width_ + this->partition_width_, matrix + (matrix_row * this->matrix_width_) + start_in_row);
-                    /* code */
-                }
-
-                //delete[] proc_buffers[i];
+                printf("%6.2f ", matrix[i * this->matrix_width_ + j]);
             }
+            putchar('\n');
         }
 
-        //MPI_Gather(partition_data, this->partition_height_ * this->partition_width_, MPI_DOUBLE, matrix, this->partition_height_ * this->partition_width_, MPI_DOUBLE, 0, this->GetCartesianCommunicator());
-        delete[] proc_buffers;
-        return matrix;
+        delete[] matrix;
     }
 
     double *Matrix::AssemblePartition()
@@ -418,6 +388,12 @@ namespace pde_solver::data::cpu_distr
 
         return partition_data;
     }
+
+    void Matrix::Synchronize()
+    {
+        MPI_Barrier(this->GetCartesianCommunicator());
+    }
+
     void Matrix::GetPartitionCoordinates(int rank, int *partition_coords)
     {
 
@@ -426,6 +402,7 @@ namespace pde_solver::data::cpu_distr
     void Matrix::PrintPartitionData()
     {
         std::cout << "Processor id: " << this->proc_id_ << "; Coordinates: (" << this->partition_coords_[0] << ", " << this->partition_coords_[1] << "); Top ID: " << this->neighbours[0].GetNeighborId() << "; Right ID: " << this->neighbours[1].GetNeighborId() << "; Bottom ID: " << this->neighbours[2].GetNeighborId() << "; Left ID: " << this->neighbours[3].GetNeighborId() << "; Partition size: " << this->partition_width_ << "x" << this->partition_height_ << std::endl;
+        double *partition_data = this->AssemblePartition();
         printf("       ");
         if (this->IsTopBorder())
         {
@@ -453,15 +430,21 @@ namespace pde_solver::data::cpu_distr
                 printf("%6.2f ", this->left_ghost_points_[i]);
             }
 
-            printf("%6.2f ", this->left_border_[i]);
-
-            int offset = (i + 1) * (this->partition_width_); // Add one to i because the first row of the inner data is the top ghost.
-            for (int j = 1; j < this->partition_width_ - 1; j++)
+            int offset = i * (this->partition_width_);
+            for (int j = 0; j < this->partition_width_; j++)
             {
-                printf("%6.2f ", this->inner_points_[offset + j]);
+                printf("%6.2f ", partition_data[offset + j]);
             }
 
-            printf("%6.2f ", this->right_border_[i]);
+            // printf("%6.2f ", this->left_border_[i]);
+
+            // int offset = (i + 1) * (this->partition_width_); // Add one to i because the first row of the inner data is the top ghost.
+            // for (int j = 1; j < this->partition_width_ - 1; j++)
+            // {
+            //     printf("%6.2f ", this->inner_points_[offset + j]);
+            // }
+
+            // printf("%6.2f ", this->right_border_[i]);
 
             if (this->IsRightBorder())
             {

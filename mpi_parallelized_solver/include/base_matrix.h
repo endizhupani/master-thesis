@@ -87,7 +87,7 @@ namespace pde_solver::data::common
          * 
          * @return double* the matrix stored as an array
          */
-        virtual double *AssembleMatrix() = 0;
+        virtual void ShowMatrix() = 0;
     };
 #endif // !BASE_MATRIX_H
 

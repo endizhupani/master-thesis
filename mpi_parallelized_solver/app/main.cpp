@@ -206,22 +206,14 @@ int main(int argc, char *argv[])
 
     m.Init(5, 1, 2, 4, 3, argc, argv);
 
-    //m.PrintMatrixInfo();
+    m.PrintMatrixInfo();
+    m.Synchronize();
     m.PrintAllPartitions();
-    double *temp = m.AssembleMatrix();
-    if (temp)
-    {
-        for (int i = 0; i < matrix_height; i++)
-        {
-            for (int j = 0; j < matrix_width; j++)
-            {
-                printf("%6.2f ", temp[i * matrix_width + j]);
-            }
-            putchar('\n');
-        }
-        delete[] temp;
-    }
+
+    m.ShowMatrix();
+
     m.Finalize();
+    return 0;
     // printf("======================================\n");
     // //run_matrix_as_array();
     // printf("Solved\n");
