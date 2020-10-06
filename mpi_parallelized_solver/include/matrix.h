@@ -131,6 +131,74 @@ namespace pde_solver::data::cpu_distr
           void InitRightBorderAndGhost(double inner_value, double right_border_value, double bottom_border_value, double top_border_value);
 
      public:
+          // class Row
+          // {
+          //      friend class Matrix;
+
+          // public:
+          //      double &operator[](int col)
+          //      {
+          //           // TODO (endizhupani@uni-muenster.de): Check if they are in the partition
+          //           if (row < 0 || col < 0)
+          //           {
+          //                throw std::out_of_range("The indexes need to be at least 0.");
+          //           }
+
+          //           if (row > parent.matrix_height_ - 1)
+          //           {
+          //                throw std::out_of_range("Row index out of bounds");
+          //           }
+
+          //           if (col > parent.matrix_width_ - 1)
+          //           {
+          //                throw std::out_of_range("Col index out of bounds");
+          //           }
+
+          //           int partition_row_start = parent.partition_coords_[0] * parent.partition_height_;
+          //           int partition_row_end = parent.partition_coords_[0] * parent.partition_height_ + parent.partition_height_ - 1;
+          //           int partition_col_start = parent.partition_coords_[1] * parent.partition_width_;
+          //           int partition_col_end = parent.partition_coords_[1] * parent.partition_width_ + parent.partition_width_ - 1;
+
+          //           if (row < partition_row_start || row > partition_row_end)
+          //           {
+          //                throw std::out_of_range("Row index out of bounds. Matrix row not in current partition");
+          //           }
+
+          //           if (col < partition_col_start || col > partition_col_end)
+          //           {
+          //                throw std::out_of_range("Col index out of bounds. Matrix column not in current partition");
+          //           }
+          //           int local_row = row - partition_row_start;
+          //           int local_col = col - partition_col_start;
+
+          //           if (local_col == 0)
+          //           {
+          //                return parent.left_border_[row];
+          //           }
+
+          //           if (local_col == parent.partition_width_ - 1)
+          //           {
+          //                return parent.right_border_[row];
+          //           }
+
+          //           return parent.inner_points_[(local_row + 1) * parent.partition_width_ + local_col];
+          //      }
+
+          // private:
+          //      Row(Matrix &parent_, int row_) : parent(parent_),
+          //                                       row(row_)
+          //      {
+          //      }
+
+          //      Matrix &parent;
+          //      int row;
+          // };
+
+          // Row operator[](int row)
+          // {
+          //      return Row(*this, row);
+          // }
+
           /**
      * @brief Construct a new Matrix object
      * 
@@ -168,6 +236,8 @@ namespace pde_solver::data::cpu_distr
      */
           void AllNeighbourExchange();
 
+          void SetLocal(double value, int row, int col);
+
           /**
      * @brief Sends the border of the partition to the specified neighbor and gets the halo values from that neighbor
      * 
@@ -180,7 +250,7 @@ namespace pde_solver::data::cpu_distr
      * 
      * @return double Maximum difference between the new and the old values
      */
-          double LocalSweep();
+          double LocalSweep(Matrix &newMatrix);
 
           /**
      * @brief Gets the global max difference by performing a reduction operation for all processors

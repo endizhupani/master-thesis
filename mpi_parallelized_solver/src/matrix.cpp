@@ -323,9 +323,56 @@ namespace pde_solver::data::cpu_distr
         }
     }
 
-    double Matrix::LocalSweep()
+    double Matrix::LocalSweep(Matrix &newMatrix)
     {
         throw "Not implemented";
+    }
+
+    void Matrix::SetLocal(double value, int row, int col)
+    {
+        if (row < 0 || col < 0)
+        {
+            return;
+        }
+
+        if (row > this->matrix_height_ - 1)
+        {
+            return;
+        }
+
+        if (col > this->matrix_width_ - 1)
+        {
+            return;
+        }
+
+        int partition_row_start = this->partition_coords_[0] * this->partition_height_;
+        int partition_row_end = this->partition_coords_[0] * this->partition_height_ + this->partition_height_ - 1;
+        int partition_col_start = this->partition_coords_[1] * this->partition_width_;
+        int partition_col_end = this->partition_coords_[1] * this->partition_width_ + this->partition_width_ - 1;
+
+        if (row < partition_row_start || row > partition_row_end)
+        {
+            return;
+        }
+
+        if (col < partition_col_start || col > partition_col_end)
+        {
+            return;
+        }
+        int local_row = row - partition_row_start;
+        int local_col = col - partition_col_start;
+
+        if (local_col == 0)
+        {
+            this->left_border_[row] = value;
+        }
+
+        if (local_col == this->partition_width_ - 1)
+        {
+            this->right_border_[row] = value;
+        }
+
+        this->inner_points_[(local_row + 1) * this->partition_width_ + local_col] = value;
     }
 
     void Matrix::ShowMatrix()
