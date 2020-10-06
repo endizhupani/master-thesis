@@ -206,7 +206,7 @@ int main(int argc, char *argv[])
 
     m.Init(5, 1, 2, 4, 3, argc, argv);
 
-    m.PrintMatrixInfo();
+    //m.PrintMatrixInfo();
     m.Synchronize();
     m.PrintAllPartitions();
 

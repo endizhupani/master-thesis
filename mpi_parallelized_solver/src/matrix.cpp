@@ -249,8 +249,9 @@ namespace pde_solver::data::cpu_distr
         {
             printf("Number of processes: %d\n", this->proc_count_);
         }
-        MPI_Barrier(MPI_COMM_WORLD);
+        MPI_Barrier(this->GetCartesianCommunicator());
         std::cout << "Processor id: " << this->proc_id_ << "; Coordinates: (" << this->partition_coords_[0] << ", " << this->partition_coords_[1] << "); Top ID: " << this->neighbours[0].GetNeighborId() << "; Right ID: " << this->neighbours[1].GetNeighborId() << "; Bottom ID: " << this->neighbours[2].GetNeighborId() << "; Left ID: " << this->neighbours[3].GetNeighborId() << "Partition size: " << this->partition_width_ << "x" << this->partition_height_ << std::endl;
+        MPI_Barrier(this->GetCartesianCommunicator());
     }
 
     void Matrix::RankByCoordinates(const int coords[2], int *rank)
@@ -329,8 +330,6 @@ namespace pde_solver::data::cpu_distr
 
     void Matrix::ShowMatrix()
     {
-        MPI_Barrier(this->GetCartesianCommunicator());
-
         double *partition_data = this->AssemblePartition();
         double *buffer, *matrix;
         if (this->proc_id_ == 0)
@@ -436,16 +435,6 @@ namespace pde_solver::data::cpu_distr
                 printf("%6.2f ", partition_data[offset + j]);
             }
 
-            // printf("%6.2f ", this->left_border_[i]);
-
-            // int offset = (i + 1) * (this->partition_width_); // Add one to i because the first row of the inner data is the top ghost.
-            // for (int j = 1; j < this->partition_width_ - 1; j++)
-            // {
-            //     printf("%6.2f ", this->inner_points_[offset + j]);
-            // }
-
-            // printf("%6.2f ", this->right_border_[i]);
-
             if (this->IsRightBorder())
             {
                 printf("%6.2f ", -1.0);
@@ -487,8 +476,6 @@ namespace pde_solver::data::cpu_distr
                 fflush(stdout);
             }
         }
-
-        MPI_Barrier(this->GetCartesianCommunicator());
     }
 
     bool Matrix::IsTopBorder()
