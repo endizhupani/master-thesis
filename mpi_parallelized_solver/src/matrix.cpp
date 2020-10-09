@@ -86,6 +86,7 @@ namespace pde_solver::data::cpu_distr
         {
             if (this->IsLeftBorder())
             {
+
                 // the value on the first column of the halo will come from the left border
                 this->inner_points_[0] = left_border_value;
             }
@@ -323,12 +324,205 @@ namespace pde_solver::data::cpu_distr
         }
     }
 
-    double Matrix::LocalSweep(Matrix &newMatrix)
+    double Matrix::LocalSweep(Matrix new_matrix)
     {
-        throw "Not implemented";
+        double max_local_difference = 0, diff, new_value;
+
+        // TODO (endizhupani@uni-muenster.de): first calculate the border points. Afterwards exchange those with neighbours. while exchanging, calculate the inner points.
+
+        if (!this->IsLeftBorder())
+        {
+            if (!this->IsTopBorder())
+            {
+                new_value = (this->left_ghost_points_[0] + this->top_ghost[0] + this->inner_points_[this->partition_width_ + 1] + this->left_border_[1]) / 4;
+                diff = fabs(new_value - this->left_border_[0]);
+                if (diff > max_local_difference)
+                {
+                    max_local_difference = diff;
+                }
+                new_matrix.SetLocal(new_value, 0, 0);
+            }
+            for (int i = 1; i < this->partition_height_ - 1; i++)
+            {
+                new_value = (this->left_border_[i - 1] + this->left_border_[i + 1] + this->left_ghost_points_[i] + this->inner_points_[i * this->partition_width_ + this->partition_width_ + 1]) / 4;
+                diff = fabs(new_value - this->left_border_[i]);
+                if (diff > max_local_difference)
+                {
+                    max_local_difference = diff;
+                }
+                new_matrix.SetLocal(new_value, i, 0);
+            }
+
+            if (!this->IsBottomBorder())
+            {
+                new_value = (this->left_ghost_points_[this->partition_height_ - 1] + this->bottom_ghost[0] + this->inner_points_[this->partition_width_ * this->partition_height_ + 1] + this->left_border_[this->partition_height_ - 2]) / 4;
+                diff = fabs(new_value - this->left_border_[this->partition_height_ - 1]);
+                if (diff > max_local_difference)
+                {
+                    max_local_difference = diff;
+                }
+                new_matrix.SetLocal(new_value, this->partition_height_ - 1, 0);
+            }
+            // TODO (endizhupani@uni-muenster.de): Calculate and send left border
+        }
+
+        if (!this->IsRightBorder())
+        {
+            new_value = (this->right_ghost_points_[0] + this->top_ghost[this->partition_width_ - 1] + this->inner_points_[2 * this->partition_width_ - 2] + this->right_border_[1]) / 4;
+            diff = fabs(new_value - this->right_border_[0]);
+            if (diff > max_local_difference)
+            {
+                max_local_difference = diff;
+            }
+            new_matrix.SetLocal(new_value, 0, this->partition_width_ - 1);
+
+            for (int i = 1; i < this->partition_height_ - 1; i++)
+            {
+                new_value = (this->right_border_[i - 1] + this->right_border_[i + 1] + this->right_ghost_points_[i] + this->inner_points_[i * this->partition_width_ + this->partition_width_ + 1]) / 4;
+                diff = fabs(new_value - this->right_border_[i]);
+                if (diff > max_local_difference)
+                {
+                    max_local_difference = diff;
+                }
+
+                new_matrix.SetLocal(new_value, i, 0);
+            }
+            new_value = (this->right_ghost_points_[this->partition_height_ - 1] + this->bottom_ghost[this->partition_width_ - 1] + this->inner_points_[this->partition_width_ * this->partition_height_ + 1] + this->right_border_[this->partition_height_ - 2]) / 4;
+            diff = fabs(new_value - this->right_border_[this->partition_height_ - 1]);
+            if (diff > max_local_difference)
+            {
+                max_local_difference = diff;
+            }
+            new_matrix.SetLocal(new_value, this->partition_height_ - 1, this->partition_width_ - 1);
+            // TODO (endizhupani@uni-muenster.de): Calculate and send right border
+        }
+
+        if (!this->IsTopBorder())
+        {
+            // first point of top border.
+            new_value = (this->inner_points_[2 * partition_width_ + 1] + this->left_border_[0] + this->top_ghost[1] + this->inner_points_[partition_width_ + 2]) / 4;
+            diff = fabs(new_value - this->inner_points_[this->partition_width_ + 1]);
+            if (diff > max_local_difference)
+            {
+                max_local_difference = diff;
+            }
+            new_matrix.SetLocal(new_value, 0, 1);
+
+            for (int i = 2; i < this->partition_width_ - 3; i++)
+            {
+                new_value = (this->inner_points_[2 * partition_width_ + i] + this->inner_points_[partition_width_ + i - 1] + this->top_ghost[i] + this->inner_points_[partition_width_ + i + 1]) / 4;
+                if (diff > max_local_difference)
+                {
+                    max_local_difference = diff;
+                }
+                new_matrix.SetLocal(new_value, 0, i);
+            }
+
+            //last point of top border
+            new_value = (this->inner_points_[4 * partition_width_ + 2] + this->right_border_[0] + this->top_ghost[this->partition_width_ - 2] + this->inner_points_[3 * partition_width_ - 3]) / 4;
+            diff = fabs(new_value - this->inner_points_[3 * partition_width_ - 2]);
+            if (diff > max_local_difference)
+            {
+                max_local_difference = diff;
+            }
+            new_matrix.SetLocal(new_value, 0, this->partition_width_ - 2);
+
+            // TODO (endizhupani@uni-muenster.de): calculate and exchange top border
+        }
+
+        if (!this->IsBottomBorder())
+        {
+            int first_point_row = partition_height_;
+            int first_point_col = 1;
+            // first point
+            new_value = (this->inner_points_[(first_point_row + 1) * partition_width_ + first_point_col] + this->left_border_[this->partition_height_ - 1] + this->bottom_ghost[1] + this->inner_points_[first_point_row * this->partition_width_ + 2]) / 4;
+            diff = fabs(new_value - this->inner_points_[first_point_row * this->partition_width_ + 1]);
+            if (diff > max_local_difference)
+            {
+                max_local_difference = diff;
+            }
+            new_matrix.SetLocal(new_value, this->partition_height_ - 1, 1);
+
+            for (int i = 2; i < this->partition_width_ - 3; i++)
+            {
+                new_value = (this->inner_points_[2 * partition_width_ + i] + this->inner_points_[partition_width_ + i - 1] + this->top_ghost[i] + this->inner_points_[partition_width_ + i + 1]) / 4;
+                if (diff > max_local_difference)
+                {
+                    max_local_difference = diff;
+                }
+                new_matrix.SetLocal(new_value, 0, i);
+            }
+
+            //last point of bottom border
+            new_value = (this->inner_points_[4 * partition_width_ + 2] + this->right_border_[0] + this->top_ghost[this->partition_width_ - 2] + this->inner_points_[3 * partition_width_ - 3]) / 4;
+            diff = fabs(new_value - this->inner_points_[3 * partition_width_ - 2]);
+            if (diff > max_local_difference)
+            {
+                max_local_difference = diff;
+            }
+            new_matrix.SetLocal(new_value, 0, this->partition_width_ - 2);
+            // TODO (endizhupani@uni-muenster.de): calculate and send bottom border
+        }
+
+        // TODO (endizhupani@uni-muenster.de): Receive borders into ghosts
+
+        // TODO (endizhupani@uni-muenster.de): Calculate inner points
+        for (int i = 1; i < this->partition_height_ - 1; i++)
+        {
+            for (int j = 1; j < this->partition_width_ - 1; j++)
+            {
+                new_value = (this->GetLocal(i - 1, j) + this->GetLocal(i + 1, j) + this->GetLocal(i, j - 1) + this->GetLocal(i, j + 1)) / 4;
+                diff = fabs(new_value - this->GetLocal(i, j));
+                if (diff > max_local_difference)
+                {
+                    max_local_difference = diff;
+                }
+                new_matrix.SetLocal(new_value, i, j);
+            }
+        }
+
+        // TODO (endizhupani@uni-muenster.de): Wait for receival to complete.
+
+        return max_local_difference;
+    }
+
+    const double Matrix::GetLocal(int partition_row, int partition_col)
+    {
+        if (partition_col < 0 || partition_col > this->partition_width_ - 1 || partition_row < 0 || partition_row > this->partition_height_ - 1)
+        {
+            throw new std::out_of_range("Index is out of range for the partition");
+        }
+        if (partition_col == 0)
+        {
+            return this->left_border_[partition_row];
+        }
+
+        if (partition_col == this->partition_width_ - 1)
+        {
+            return right_border_[partition_row];
+        }
+
+        int row_offset = (partition_row + 1) * this->partition_width_;
+
+        return this->inner_points_[row_offset + partition_col];
     }
 
     void Matrix::SetLocal(double value, int row, int col)
+    {
+        if (col == 0)
+        {
+            this->left_border_[row] = value;
+        }
+
+        if (col == this->partition_width_ - 1)
+        {
+            this->right_border_[row] = value;
+        }
+
+        this->inner_points_[(row + 1) * this->partition_width_ + col] = value;
+    }
+
+    void Matrix::SetGlobal(double value, int row, int col)
     {
         if (row < 0 || col < 0)
         {
@@ -361,18 +555,7 @@ namespace pde_solver::data::cpu_distr
         }
         int local_row = row - partition_row_start;
         int local_col = col - partition_col_start;
-
-        if (local_col == 0)
-        {
-            this->left_border_[row] = value;
-        }
-
-        if (local_col == this->partition_width_ - 1)
-        {
-            this->right_border_[row] = value;
-        }
-
-        this->inner_points_[(local_row + 1) * this->partition_width_ + local_col] = value;
+        this->SetLocal(value, local_row, local_col);
     }
 
     void Matrix::ShowMatrix()
