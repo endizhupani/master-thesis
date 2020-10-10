@@ -174,6 +174,8 @@ namespace pde_solver::data::cpu_distr
 
           const double GetLocal(int partition_row, int partition_col);
 
+          const PartitionNeighbour GetNeighbour(PartitionNeighbourType neighbour_type);
+
           /**
      * @brief Sends the border of the partition to the specified neighbor and gets the halo values from that neighbor
      * 
