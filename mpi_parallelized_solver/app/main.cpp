@@ -5,10 +5,10 @@
 #include "cache_helpers.h"
 #include "matrix.h"
 using namespace std;
-#define N 4000
+#define N 10
 #define EPSILON 0.01
 #define N_THREADS 8
-#define MAX_ITER 1815
+#define MAX_ITER 1
 //#define CACHE_LINE_SIZE sysconf(_SC_LEVEL1_DCACHE_LINESIZE)
 
 int getChunkSize(int arrayCount, int numElPerLine);
@@ -201,18 +201,38 @@ void run_matrix_as_array()
 int main(int argc, char *argv[])
 {
     //run_matrix_as_matrix();
-    int matrix_width = 10, matrix_height = 10;
-    pde_solver::data::cpu_distr::Matrix m(1, matrix_width, matrix_height);
 
-    m.Init(5, 1, 2, 4, 3, argc, argv);
+    pde_solver::data::cpu_distr::Matrix m(1, N, N);
+    m.Init(75, 100, 100, 0, 100, argc, argv);
 
+    pde_solver::data::cpu_distr::Matrix new_m = m.CloneShell();
+    //m.PrintAllPartitions();
+    new_m.PrintAllPartitions();
+    int num_iter = 0;
+    double global_diff = 10;
+    while (global_diff > EPSILON && num_iter++ < MAX_ITER)
+    {
+
+        m.LocalSweep(new_m);
+        if (num_iter % 4 == 0)
+        {
+            global_diff = m.GlobalDifference();
+        }
+
+        pde_solver::data::cpu_distr::Matrix tmp = m;
+        m = new_m;
+        new_m = tmp;
+    }
     //m.PrintMatrixInfo();
-    m.Synchronize();
-    m.PrintAllPartitions();
+    // m.Synchronize();
 
     m.ShowMatrix();
+    //m.PrintAllPartitions();
+    new_m.Deallocate();
 
     m.Finalize();
+    printf("iter: %d\n", num_iter);
+    printf("difference: %f\n", global_diff);
     return 0;
     // printf("======================================\n");
     // //run_matrix_as_array();

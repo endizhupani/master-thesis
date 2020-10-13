@@ -39,7 +39,6 @@ namespace pde_solver::data::common
 
         // global matrix height
         int matrix_height_;
-
         // array that holds the left border of the partition
         double *left_border_;
 

@@ -35,12 +35,6 @@ namespace pde_solver::data::cpu_distr
      class Matrix : public common::BaseMatrix
      {
      private:
-          // points that are used by the stencil calcuation of the points in the left border of the partition
-          double *left_ghost_points_;
-
-          // points taht are used by the stencil calcuation of the points in the right border of the partition
-          double *right_ghost_points_;
-
           // number of rows or columns that will serve as the halo of the partition
           int halo_size_;
 
@@ -63,7 +57,7 @@ namespace pde_solver::data::cpu_distr
           int x_partitions_;
 
           // Neighbours on the top, right, bottom and left of the partition
-          PartitionNeighbour neighbours[4];
+          std::array<PartitionNeighbour, 4> neighbours;
 
           // Coordnates of the partition in the cartesian topology
           int partition_coords_[2];
@@ -83,16 +77,28 @@ namespace pde_solver::data::cpu_distr
           // Number of processes in each dimension. The first element determines the number processes along the vertical dimension the second, the number of processes along the horizontal dimension.
           int processes_per_dimension_[2];
 
-          int right_grid_border_coord;
-          int left_grid_border_coord;
-          int bottom_grid_border_coord;
-          int top_grid_border_coord;
+          int right_grid_border_coord_;
+          int left_grid_border_coord_;
+          int bottom_grid_border_coord_;
+          int top_grid_border_coord_;
 
           // Pointer to the final row of inner_data
           double *bottom_ghost;
 
           // Pointer to the first row of the inner_data. Technically inner_data can be used with the same result but this was supplied for completeness.
           double *top_ghost;
+
+          // points that are used by the stencil calcuation of the points in the left border of the partition
+          double *left_ghost_points_;
+
+          // points taht are used by the stencil calcuation of the points in the right border of the partition
+          double *right_ghost_points_;
+
+          double initial_inner_value_;
+          double initial_left_value_;
+          double initial_right_value_;
+          double initial_top_value_;
+          double initial_bottom_value_;
 
           /**
      * @brief Initializes the MPI context
@@ -109,7 +115,7 @@ namespace pde_solver::data::cpu_distr
        * @param rank 
        */
           void RankByCoordinates(const int coords[2], int *rank);
-
+          void InitData(double inner_value, double left_border_value, double right_border_value, double bottom_border_value, double top_border_value);
           /**
        * @brief Initializes the left border of the partition and left ghost points that are part of the halo. 
        * 
@@ -131,7 +137,10 @@ namespace pde_solver::data::cpu_distr
  */
           void InitRightBorderAndGhost(double inner_value, double right_border_value, double bottom_border_value, double top_border_value);
 
+          void AllocateMemory();
+
      public:
+          void Deallocate();
           /**
      * @brief Construct a new Matrix object
      * 
@@ -195,7 +204,7 @@ namespace pde_solver::data::cpu_distr
      * 
      * @return double Global max difference
      */
-          double GlobalDifference();
+          const double GlobalDifference();
 
           /**
      * @brief Prints information about the current partition.
@@ -222,6 +231,8 @@ namespace pde_solver::data::cpu_distr
           void ShowMatrix();
 
           void Synchronize();
+
+          Matrix CloneShell();
 
           /**
  * @brief Puts together the data in the partition

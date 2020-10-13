@@ -39,38 +39,41 @@ namespace pde_solver::data::cpu_distr
         return this->cartesian_communicator_;
     }
 
-    void Matrix::Init(double value, int argc, char *argv[])
+    Matrix Matrix::CloneShell()
     {
-        this->Init(value, value, value, value, value, argc, argv);
+        Matrix m(this->halo_size_, this->matrix_width_, this->matrix_height_);
+        m.neighbours = this->neighbours;
+        m.partition_coords_[0] = this->partition_coords_[0];
+        m.partition_coords_[1] = this->partition_coords_[1];
+        m.processes_per_dimension_[0] = this->processes_per_dimension_[0];
+        m.processes_per_dimension_[1] = this->processes_per_dimension_[1];
+        m.partition_height_ = this->partition_height_;
+        m.partition_width_ = this->partition_width_;
+        m.proc_id_ = this->proc_id_;
+        m.proc_count_ = this->proc_count_;
+        m.x_partitions_ = this->x_partitions_;
+        m.y_partitions_ = this->y_partitions_;
+        m.is_initialized_ = this->is_initialized_;
+        m.right_grid_border_coord_ = this->right_grid_border_coord_;
+        m.left_grid_border_coord_ = this->left_grid_border_coord_;
+        m.bottom_grid_border_coord_ = this->bottom_grid_border_coord_;
+        m.top_grid_border_coord_ = this->top_grid_border_coord_;
+        m.cartesian_communicator_ = this->cartesian_communicator_;
+        m.InitData(this->initial_inner_value_, this->initial_left_value_, this->initial_right_value_, this->initial_bottom_value_, this->initial_top_value_);
+        return m;
     }
 
-    void Matrix::Init(double inner_value, double left_border_value, double right_border_value, double bottom_border_value, double top_border_value, int argc, char *argv[])
+    void Matrix::InitData(double inner_value, double left_border_value, double right_border_value, double bottom_border_value, double top_border_value)
     {
-        if (!is_initialized_)
-        {
-            this->InitializeMPI(argc, argv);
-        }
-
-        if (this->matrix_width_ % this->processes_per_dimension_[1] != 0)
-        {
-
-            throw new std::logic_error("The width of the matrix must be divisable by the number of processes along the x dimension: " + std::to_string(this->processes_per_dimension_[0]));
-        }
-
-        // This is the partition width without ghost points
-        this->partition_width_ = this->matrix_width_ / this->processes_per_dimension_[1];
-
-        if (this->matrix_height_ % this->processes_per_dimension_[0] != 0)
-        {
-            throw new std::logic_error("The height of the matrix must be divisable by the number of processes along the y dimension: " + std::to_string(this->processes_per_dimension_[0]));
-        }
-
-        // This is the partition height without the ghost points.
-        this->partition_height_ = this->matrix_height_ / this->processes_per_dimension_[0];
-        int inner_data_width = this->partition_width_;                          //(this->partition_width_ - 2);
-        int inner_data_height = this->partition_height_ + 2;                    // Two extra rows to hold the top and bottom halo
-        this->inner_points_ = new double[inner_data_height * inner_data_width]; // Since the left and right borders of the partitions are stored separately, there is no need to store them on teh inner points array.
-
+        this->initial_inner_value_ = inner_value;
+        this->initial_left_value_ = left_border_value;
+        this->initial_right_value_ = right_border_value;
+        this->initial_bottom_value_ = bottom_border_value;
+        this->initial_top_value_ = top_border_value;
+        int inner_data_width = this->partition_width_;       //(this->partition_width_ - 2);
+        int inner_data_height = this->partition_height_ + 2; // Two extra rows to hold the top and bottom halo
+                                                             //this->inner_points_ = new double[inner_data_height * inner_data_width]; // Since the left and right borders of the partitions are stored separately, there is no need to store them on teh inner points array.
+        this->AllocateMemory();
         this->InitLeftBorderAndGhost(inner_value, left_border_value, bottom_border_value, top_border_value);
         this->InitRightBorderAndGhost(inner_value, right_border_value, bottom_border_value, top_border_value);
 
@@ -81,7 +84,7 @@ namespace pde_solver::data::cpu_distr
 
         // Top halo initialization
         // If the partition is on top border of the grid, there is no top halo to initialize.
-        this->top_ghost = &this->inner_points_[0];
+
         if (!this->IsTopBorder())
         {
             if (this->IsLeftBorder())
@@ -113,7 +116,7 @@ namespace pde_solver::data::cpu_distr
 
         // Bottom Halo initialization
         // if the partition is on the border level of the
-        this->bottom_ghost = &this->inner_points_[(inner_data_height - 1) * inner_data_width];
+
         if (!this->IsBottomBorder())
         {
             row = inner_data_height - 1;
@@ -163,6 +166,59 @@ namespace pde_solver::data::cpu_distr
                 }
             }
         }
+    }
+
+    void Matrix::Init(double value, int argc, char *argv[])
+    {
+        this->Init(value, value, value, value, value, argc, argv);
+    }
+
+    void Matrix::Deallocate()
+    {
+        delete[] left_ghost_points_;
+        delete[] right_ghost_points_;
+        delete[] left_border_;
+        delete[] right_border_;
+        delete[] inner_points_;
+    }
+
+    void Matrix::AllocateMemory()
+    {
+        int inner_data_width = this->partition_width_;                          //(this->partition_width_ - 2);
+        int inner_data_height = this->partition_height_ + 2;                    // Two extra rows to hold the top and bottom halo
+        this->inner_points_ = new double[inner_data_height * inner_data_width]; // Since the left and right borders of the partitions are stored separately, there is no need to store them on teh inner points array.
+        this->left_border_ = new double[this->partition_height_];
+        this->left_ghost_points_ = new double[this->partition_height_];
+        this->right_border_ = new double[this->partition_height_];
+        this->right_ghost_points_ = new double[this->partition_height_];
+        this->top_ghost = &this->inner_points_[0];
+        this->bottom_ghost = &this->inner_points_[(inner_data_height - 1) * inner_data_width];
+    }
+
+    void Matrix::Init(double inner_value, double left_border_value, double right_border_value, double bottom_border_value, double top_border_value, int argc, char *argv[])
+    {
+        if (!is_initialized_)
+        {
+            this->InitializeMPI(argc, argv);
+        }
+
+        if (this->matrix_width_ % this->processes_per_dimension_[1] != 0)
+        {
+
+            throw new std::logic_error("The width of the matrix must be divisable by the number of processes along the x dimension: " + std::to_string(this->processes_per_dimension_[0]));
+        }
+
+        // This is the partition width without ghost points
+        this->partition_width_ = this->matrix_width_ / this->processes_per_dimension_[1];
+
+        if (this->matrix_height_ % this->processes_per_dimension_[0] != 0)
+        {
+            throw new std::logic_error("The height of the matrix must be divisable by the number of processes along the y dimension: " + std::to_string(this->processes_per_dimension_[0]));
+        }
+
+        // This is the partition height without the ghost points.
+        this->partition_height_ = this->matrix_height_ / this->processes_per_dimension_[0];
+        this->InitData(inner_value, left_border_value, right_border_value, bottom_border_value, top_border_value);
 
         MPI_Barrier(this->GetCartesianCommunicator());
     }
@@ -172,8 +228,6 @@ namespace pde_solver::data::cpu_distr
 
         // assing the left border values. If the partition is on the border of the cartesian grid,
         // the left border values should receive the values from the parameter 'left_border_value'
-        this->left_border_ = new double[this->partition_height_];
-        this->left_ghost_points_ = new double[this->partition_height_];
 
         if (this->IsLeftBorder())
         {
@@ -209,8 +263,6 @@ namespace pde_solver::data::cpu_distr
 
     void Matrix::InitRightBorderAndGhost(double inner_value, double right_border_value, double bottom_border_value, double top_border_value)
     {
-        this->right_border_ = new double[this->partition_height_];
-        this->right_ghost_points_ = new double[this->partition_height_];
 
         //assign the right border values of the global matrix
         if (this->IsRightBorder())
@@ -278,10 +330,10 @@ namespace pde_solver::data::cpu_distr
         int periods[2] = {0, 0};
 
         MPI_Dims_create(this->proc_count_, n_dim, this->processes_per_dimension_);
-        this->right_grid_border_coord = this->processes_per_dimension_[1] - 1;
-        this->bottom_grid_border_coord = this->processes_per_dimension_[0] - 1;
-        this->left_grid_border_coord = 0;
-        this->top_grid_border_coord = 0;
+        this->right_grid_border_coord_ = this->processes_per_dimension_[1] - 1;
+        this->bottom_grid_border_coord_ = this->processes_per_dimension_[0] - 1;
+        this->left_grid_border_coord_ = 0;
+        this->top_grid_border_coord_ = 0;
 
         MPI_Cart_create(MPI_COMM_WORLD, n_dim, this->processes_per_dimension_, periods, 1, &this->cartesian_communicator_);
         MPI_Comm_rank(this->GetCartesianCommunicator(), &proc_id_);
@@ -311,11 +363,7 @@ namespace pde_solver::data::cpu_distr
 
     void Matrix::Finalize()
     {
-        delete[] left_ghost_points_;
-        delete[] right_ghost_points_;
-        delete[] left_border_;
-        delete[] right_border_;
-        delete[] inner_points_;
+        Deallocate();
         MPI_Barrier(this->GetCartesianCommunicator());
         int result = MPI_Finalize();
         if (this->proc_id_ == 0)
@@ -326,9 +374,10 @@ namespace pde_solver::data::cpu_distr
 
     double Matrix::LocalSweep(Matrix new_matrix)
     {
-        double max_local_difference = 0, diff, new_value;
-        // 4 borders
-        MPI_Request requests[4];
+        this->current_max_difference_ = 0;
+        double diff, new_value;
+        // 4 sends and 4 receives
+        MPI_Request requests[8];
         // TODO (endizhupani@uni-muenster.de): first calculate the border points. Afterwards exchange those with neighbours. while exchanging, calculate the inner points.
 
         if (!this->IsLeftBorder())
@@ -337,9 +386,9 @@ namespace pde_solver::data::cpu_distr
             {
                 new_value = (this->left_ghost_points_[0] + this->top_ghost[0] + this->GetLocal(0, 1) + this->GetLocal(1, 0)) / 4;
                 diff = fabs(new_value - this->GetLocal(0, 0));
-                if (diff > max_local_difference)
+                if (diff > current_max_difference_)
                 {
-                    max_local_difference = diff;
+                    current_max_difference_ = diff;
                 }
                 new_matrix.SetLocal(new_value, 0, 0);
             }
@@ -347,9 +396,9 @@ namespace pde_solver::data::cpu_distr
             {
                 new_value = (this->GetLocal(i - 1, 0) + this->GetLocal(i + 1, 0) + this->left_ghost_points_[i] + this->GetLocal(i, 1)) / 4;
                 diff = fabs(new_value - this->GetLocal(i, 0));
-                if (diff > max_local_difference)
+                if (diff > current_max_difference_)
                 {
-                    max_local_difference = diff;
+                    current_max_difference_ = diff;
                 }
                 new_matrix.SetLocal(new_value, i, 0);
             }
@@ -358,26 +407,30 @@ namespace pde_solver::data::cpu_distr
             {
                 new_value = (this->left_ghost_points_[this->partition_height_ - 1] + this->bottom_ghost[0] + this->GetLocal(this->partition_height_ - 2, 0) + this->GetLocal(this->partition_height_ - 1, 1)) / 4;
                 diff = fabs(new_value - this->GetLocal(this->partition_height_ - 1, 0));
-                if (diff > max_local_difference)
+                if (diff > current_max_difference_)
                 {
-                    max_local_difference = diff;
+                    current_max_difference_ = diff;
                 }
                 new_matrix.SetLocal(new_value, this->partition_height_ - 1, 0);
             }
-            // TODO (endizhupani@uni-muenster.de): Calculate and send left border
             auto neighbour_left = this->GetNeighbour(PartitionNeighbourType::LEFT_NEIGHTBOUR);
 
-            MPI_Isend(this->left_border_, this->partition_height_, MPI_DOUBLE, neighbour_left.id, MPI_ANY_TAG, this->GetCartesianCommunicator(), &requests[0]);
-            // TODO (endizhupani@uni-muenster.de): Receive left ghost
+            MPI_Isend(new_matrix.left_border_, this->partition_height_, MPI_DOUBLE, neighbour_left.id, 0, this->GetCartesianCommunicator(), &requests[0]);
+            MPI_Irecv(new_matrix.left_ghost_points_, this->partition_height_, MPI_DOUBLE, neighbour_left.id, MPI_ANY_TAG, this->GetCartesianCommunicator(), &requests[4]);
+        }
+        else
+        {
+            MPI_Isend(this->left_border_, this->partition_height_, MPI_DOUBLE, MPI_PROC_NULL, 0, this->GetCartesianCommunicator(), &requests[0]);
+            MPI_Irecv(new_matrix.left_ghost_points_, this->partition_height_, MPI_DOUBLE, MPI_PROC_NULL, MPI_ANY_TAG, this->GetCartesianCommunicator(), &requests[4]);
         }
 
         if (!this->IsRightBorder())
         {
             new_value = (this->right_ghost_points_[0] + this->top_ghost[this->partition_width_ - 1] + this->GetLocal(0, this->partition_width_ - 2) + this->GetLocal(1, this->partition_width_ - 1)) / 4;
             diff = fabs(new_value - this->GetLocal(0, this->partition_width_ - 1));
-            if (diff > max_local_difference)
+            if (diff > current_max_difference_)
             {
-                max_local_difference = diff;
+                current_max_difference_ = diff;
             }
             new_matrix.SetLocal(new_value, 0, this->partition_width_ - 1);
 
@@ -385,22 +438,30 @@ namespace pde_solver::data::cpu_distr
             {
                 new_value = (this->GetLocal(i, this->partition_width_ - 2) + this->right_ghost_points_[i] + this->GetLocal(i - 1, this->partition_width_ - 1) + this->GetLocal(i + 1, this->partition_width_ - 1)) / 4;
                 diff = fabs(new_value - this->GetLocal(i, this->partition_width_ - 1));
-                if (diff > max_local_difference)
+                if (diff > current_max_difference_)
                 {
-                    max_local_difference = diff;
+                    current_max_difference_ = diff;
                 }
 
                 new_matrix.SetLocal(new_value, i, 0);
             }
             new_value = (this->right_ghost_points_[this->partition_height_ - 1] + this->bottom_ghost[this->partition_width_ - 1] + this->GetLocal(this->partition_height_ - 1, this->partition_width_ - 2) + this->GetLocal(this->partition_height_ - 2, this->partition_width_ - 1)) / 4;
             diff = fabs(new_value - this->GetLocal(this->partition_height_ - 1, this->partition_width_ - 1));
-            if (diff > max_local_difference)
+            if (diff > current_max_difference_)
             {
-                max_local_difference = diff;
+                current_max_difference_ = diff;
             }
             new_matrix.SetLocal(new_value, this->partition_height_ - 1, this->partition_width_ - 1);
-            // TODO (endizhupani@uni-muenster.de): send right border from new matrix
-            // TODO (endizhupani@uni-muenster.de): receive right ghost at new matrix
+
+            auto neighbour_right = this->GetNeighbour(PartitionNeighbourType::RIGHT_NEIGHBOUR);
+
+            MPI_Isend(new_matrix.right_border_, this->partition_height_, MPI_DOUBLE, neighbour_right.id, 0, this->GetCartesianCommunicator(), &requests[1]);
+            MPI_Irecv(new_matrix.right_ghost_points_, this->partition_height_, MPI_DOUBLE, neighbour_right.id, MPI_ANY_TAG, this->GetCartesianCommunicator(), &requests[5]);
+        }
+        else
+        {
+            MPI_Isend(new_matrix.right_border_, this->partition_height_, MPI_DOUBLE, MPI_PROC_NULL, 0, this->GetCartesianCommunicator(), &requests[1]);
+            MPI_Irecv(new_matrix.right_ghost_points_, this->partition_height_, MPI_DOUBLE, MPI_PROC_NULL, MPI_ANY_TAG, this->GetCartesianCommunicator(), &requests[5]);
         }
 
         if (!this->IsTopBorder())
@@ -409,53 +470,80 @@ namespace pde_solver::data::cpu_distr
             {
                 new_value = (this->GetLocal(0, i - 1) + this->GetLocal(0, i + 1) + this->GetLocal(1, i) + this->top_ghost[i]) / 4;
                 diff = fabs(new_value - this->GetLocal(0, i));
-                if (diff > max_local_difference)
+                if (diff > current_max_difference_)
                 {
-                    max_local_difference = diff;
+                    current_max_difference_ = diff;
                 }
                 new_matrix.SetLocal(new_value, 0, i);
             }
-            // TODO (endizhupani@uni-muenster.de): sned top border up
-            // TODO (endizhupani@uni-muenster.de): receive top ghost
+
+            auto neighbour_top = this->GetNeighbour(PartitionNeighbourType::TOP_NEIGHBOUR);
+            MPI_Isend(&new_matrix.inner_points_[this->partition_width_], this->partition_width_, MPI_DOUBLE, neighbour_top.id, 0, this->GetCartesianCommunicator(), &requests[2]);
+            MPI_Irecv(new_matrix.top_ghost, this->partition_width_, MPI_DOUBLE, neighbour_top.id, MPI_ANY_TAG, this->GetCartesianCommunicator(), &requests[6]);
+        }
+        else
+        {
+            MPI_Isend(&new_matrix.inner_points_[this->partition_width_], this->partition_width_, MPI_DOUBLE, MPI_PROC_NULL, 0, this->GetCartesianCommunicator(), &requests[2]);
+            MPI_Irecv(new_matrix.top_ghost, this->partition_width_, MPI_DOUBLE, MPI_PROC_NULL, MPI_ANY_TAG, this->GetCartesianCommunicator(), &requests[6]);
         }
 
         if (!this->IsBottomBorder())
         {
-
             new_matrix.SetLocal(new_value, this->partition_height_ - 1, 1);
 
             for (int i = 1; i < this->partition_width_ - 1; i++)
             {
                 new_value = (this->GetLocal(this->partition_height_ - 1, i - 1) + this->GetLocal(this->partition_height_ - 1, i + 1) + this->GetLocal(this->partition_height_ - 2, i) + this->bottom_ghost[i]) / 4;
-                if (diff > max_local_difference)
+                if (diff > current_max_difference_)
                 {
-                    max_local_difference = diff;
+                    current_max_difference_ = diff;
                 }
                 new_matrix.SetLocal(new_value, this->partition_height_ - 1, i);
             }
-            // TODO (endizhupani@uni-muenster.de): Send bottom border down
-            // TODO (endizhupani@uni-muenster.de): receive bottom ghost
+
+            auto neighbour_bottom = this->GetNeighbour(PartitionNeighbourType::BOTTOM_NEIGHBOUR);
+            MPI_Isend(&new_matrix.inner_points_[this->partition_height_ * this->partition_width_], this->partition_width_, MPI_DOUBLE, neighbour_bottom.id, 0, this->GetCartesianCommunicator(), &requests[3]);
+            MPI_Irecv(new_matrix.bottom_ghost, this->partition_width_, MPI_DOUBLE, neighbour_bottom.id, MPI_ANY_TAG, this->GetCartesianCommunicator(), &requests[7]);
+        }
+        else
+        {
+            MPI_Isend(&new_matrix.inner_points_[this->partition_height_ * this->partition_width_], this->partition_width_, MPI_DOUBLE, MPI_PROC_NULL, 0, this->GetCartesianCommunicator(), &requests[3]);
+            MPI_Irecv(new_matrix.bottom_ghost, this->partition_width_, MPI_DOUBLE, MPI_PROC_NULL, MPI_ANY_TAG, this->GetCartesianCommunicator(), &requests[7]);
         }
 
-        
-        // TODO (endizhupani@uni-muenster.de): Calculate inner points
         for (int i = 1; i < this->partition_height_ - 1; i++)
         {
             for (int j = 1; j < this->partition_width_ - 1; j++)
             {
                 new_value = (this->GetLocal(i - 1, j) + this->GetLocal(i + 1, j) + this->GetLocal(i, j - 1) + this->GetLocal(i, j + 1)) / 4;
                 diff = fabs(new_value - this->GetLocal(i, j));
-                if (diff > max_local_difference)
+                if (diff > current_max_difference_)
                 {
-                    max_local_difference = diff;
+                    current_max_difference_ = diff;
                 }
                 new_matrix.SetLocal(new_value, i, j);
             }
         }
+        MPI_Waitall(8, requests, MPI_STATUSES_IGNORE);
+        return current_max_difference_;
+    }
 
-        // TODO (endizhupani@uni-muenster.de): Wait for receival to complete.
+    const PartitionNeighbour Matrix::GetNeighbour(PartitionNeighbourType neighbour_type)
+    {
+        switch (neighbour_type)
+        {
+        case PartitionNeighbourType::TOP_NEIGHBOUR:
+            return this->neighbours[0];
+        case PartitionNeighbourType::BOTTOM_NEIGHBOUR:
+            return this->neighbours[2];
+        case PartitionNeighbourType::LEFT_NEIGHTBOUR:
+            return this->neighbours[3];
+        case PartitionNeighbourType::RIGHT_NEIGHBOUR:
+            return this->neighbours[1];
 
-        return max_local_difference;
+        default:
+            throw new std::out_of_range("The neighbour type must be TOP_NEIGHBOUR, BOTTOM_NEIGHBOUR, RIGHT_NEIGHBOUR or LEFT_NEIGHBOUR");
+        }
     }
 
     const double Matrix::GetLocal(int partition_row, int partition_col)
@@ -484,11 +572,25 @@ namespace pde_solver::data::cpu_distr
         if (col == 0)
         {
             this->left_border_[row] = value;
+            // If it's the left border on the first or last row of the partition, copy it to the inner points as well because it will be easier to transfer it to the bottom and top ghost points of the top and bottom neightbours.
+            if (row == 0 || row == this->partition_height_ - 1)
+            {
+                this->inner_points_[(row + 1) * this->partition_width_] = value;
+            }
+
+            return;
         }
 
         if (col == this->partition_width_ - 1)
         {
             this->right_border_[row] = value;
+            // If it's the left border on the first or last row of the partition, copy it to the inner points as well because it will be easier to transfer it to the bottom and top ghost points of the top and bottom neightbours.
+            if (row == 0 || row == this->partition_height_ - 1)
+            {
+                this->inner_points_[(row + 1) * this->partition_width_ + col] = value;
+            }
+
+            return;
         }
 
         this->inner_points_[(row + 1) * this->partition_width_ + col] = value;
@@ -528,6 +630,13 @@ namespace pde_solver::data::cpu_distr
         int local_row = row - partition_row_start;
         int local_col = col - partition_col_start;
         this->SetLocal(value, local_row, local_col);
+    }
+
+    const double Matrix::GlobalDifference()
+    {
+        MPI_Barrier(this->GetCartesianCommunicator());
+        MPI_Allreduce(&current_max_difference_, &current_max_difference_, 1, MPI_DOUBLE, MPI_MAX, this->GetCartesianCommunicator());
+        return current_max_difference_;
     }
 
     void Matrix::ShowMatrix()
@@ -682,19 +791,19 @@ namespace pde_solver::data::cpu_distr
 
     bool Matrix::IsTopBorder()
     {
-        return this->partition_coords_[0] == this->top_grid_border_coord;
+        return this->partition_coords_[0] == this->top_grid_border_coord_;
     }
     bool Matrix::IsBottomBorder()
     {
-        return this->partition_coords_[0] == this->bottom_grid_border_coord;
+        return this->partition_coords_[0] == this->bottom_grid_border_coord_;
     }
     bool Matrix::IsLeftBorder()
     {
-        return this->partition_coords_[1] == this->left_grid_border_coord;
+        return this->partition_coords_[1] == this->left_grid_border_coord_;
     }
     bool Matrix::IsRightBorder()
     {
-        return this->partition_coords_[1] == this->right_grid_border_coord;
+        return this->partition_coords_[1] == this->right_grid_border_coord_;
     }
 
 } // namespace pde_solver::data::cpu_distr
