@@ -5,10 +5,10 @@
 #include "cache_helpers.h"
 #include "matrix.h"
 using namespace std;
-#define N 10
+#define N 1000
 #define EPSILON 0.01
 #define N_THREADS 8
-#define MAX_ITER 1
+#define MAX_ITER 5000
 //#define CACHE_LINE_SIZE sysconf(_SC_LEVEL1_DCACHE_LINESIZE)
 
 int getChunkSize(int arrayCount, int numElPerLine);
@@ -207,7 +207,7 @@ int main(int argc, char *argv[])
 
     pde_solver::data::cpu_distr::Matrix new_m = m.CloneShell();
     //m.PrintAllPartitions();
-    new_m.PrintAllPartitions();
+    //new_m.PrintAllPartitions();
     int num_iter = 0;
     double global_diff = 10;
     while (global_diff > EPSILON && num_iter++ < MAX_ITER)
@@ -225,9 +225,9 @@ int main(int argc, char *argv[])
     }
     //m.PrintMatrixInfo();
     // m.Synchronize();
+    // m.PrintAllPartitions();
+    // m.ShowMatrix();
 
-    m.ShowMatrix();
-    //m.PrintAllPartitions();
     new_m.Deallocate();
 
     m.Finalize();

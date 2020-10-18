@@ -426,14 +426,16 @@ namespace pde_solver::data::cpu_distr
 
         if (!this->IsRightBorder())
         {
-            new_value = (this->right_ghost_points_[0] + this->top_ghost[this->partition_width_ - 1] + this->GetLocal(0, this->partition_width_ - 2) + this->GetLocal(1, this->partition_width_ - 1)) / 4;
-            diff = fabs(new_value - this->GetLocal(0, this->partition_width_ - 1));
-            if (diff > current_max_difference_)
+            if (!this->IsTopBorder())
             {
-                current_max_difference_ = diff;
+                new_value = (this->right_ghost_points_[0] + this->top_ghost[this->partition_width_ - 1] + this->GetLocal(0, this->partition_width_ - 2) + this->GetLocal(1, this->partition_width_ - 1)) / 4;
+                diff = fabs(new_value - this->GetLocal(0, this->partition_width_ - 1));
+                if (diff > current_max_difference_)
+                {
+                    current_max_difference_ = diff;
+                }
+                new_matrix.SetLocal(new_value, 0, this->partition_width_ - 1);
             }
-            new_matrix.SetLocal(new_value, 0, this->partition_width_ - 1);
-
             for (int i = 1; i < this->partition_height_ - 1; i++)
             {
                 new_value = (this->GetLocal(i, this->partition_width_ - 2) + this->right_ghost_points_[i] + this->GetLocal(i - 1, this->partition_width_ - 1) + this->GetLocal(i + 1, this->partition_width_ - 1)) / 4;
@@ -443,16 +445,19 @@ namespace pde_solver::data::cpu_distr
                     current_max_difference_ = diff;
                 }
 
-                new_matrix.SetLocal(new_value, i, 0);
+                new_matrix.SetLocal(new_value, i, this->partition_width_ - 1);
             }
-            new_value = (this->right_ghost_points_[this->partition_height_ - 1] + this->bottom_ghost[this->partition_width_ - 1] + this->GetLocal(this->partition_height_ - 1, this->partition_width_ - 2) + this->GetLocal(this->partition_height_ - 2, this->partition_width_ - 1)) / 4;
-            diff = fabs(new_value - this->GetLocal(this->partition_height_ - 1, this->partition_width_ - 1));
-            if (diff > current_max_difference_)
-            {
-                current_max_difference_ = diff;
-            }
-            new_matrix.SetLocal(new_value, this->partition_height_ - 1, this->partition_width_ - 1);
 
+            if (!this->IsBottomBorder())
+            {
+                new_value = (this->right_ghost_points_[this->partition_height_ - 1] + this->bottom_ghost[this->partition_width_ - 1] + this->GetLocal(this->partition_height_ - 1, this->partition_width_ - 2) + this->GetLocal(this->partition_height_ - 2, this->partition_width_ - 1)) / 4;
+                diff = fabs(new_value - this->GetLocal(this->partition_height_ - 1, this->partition_width_ - 1));
+                if (diff > current_max_difference_)
+                {
+                    current_max_difference_ = diff;
+                }
+                new_matrix.SetLocal(new_value, this->partition_height_ - 1, this->partition_width_ - 1);
+            }
             auto neighbour_right = this->GetNeighbour(PartitionNeighbourType::RIGHT_NEIGHBOUR);
 
             MPI_Isend(new_matrix.right_border_, this->partition_height_, MPI_DOUBLE, neighbour_right.id, 0, this->GetCartesianCommunicator(), &requests[1]);
