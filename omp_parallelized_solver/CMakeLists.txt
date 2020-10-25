@@ -10,12 +10,6 @@ find_package(OpenMP REQUIRED)
 set(executable main.cpp)
 
 set(executable_name ${project_name}.exe)
-#
-#set(OPENMP_FLAGS "")
-#
-#foreach (flag ${OpenMP_CXX_FLAGS})
-#    string(APPEND OPENMP_FLAGS " ${flag} ")
-#endforeach (flag ${OpenMP_CXX_FLAGS})
 
 if (OPENMP_FOUND)
     set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
