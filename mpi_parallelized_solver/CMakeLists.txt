@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.16)
+cmake_minimum_required(VERSION 3.15)
 set(CMAKE_VERBOSE_MAKEFILE ON)
 set(project_name mpi_parallelized_solver)
 project(${project_name})

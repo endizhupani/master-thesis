@@ -24,6 +24,7 @@
 #include "base_matrix.h"
 #include "mpi.h"
 #include "math.h"
+#include <array>
 #ifndef MATRIX_H
 #define MATRIX_H
 namespace pde_solver::data::cpu_distr

@@ -1,1 +1,9 @@
-cmake --build ./build --config Release --target all -- -j 10
+#! /bin/bash
+rm -rf build \
+&& mkdir build \
+&& cd build \
+&& cmake -G "Unix Makefiles" .. \
+&& make \
+&& cd ..
+
+

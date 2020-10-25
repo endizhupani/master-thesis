@@ -204,7 +204,7 @@ int main(int argc, char *argv[])
 
     pde_solver::data::cpu_distr::Matrix m(1, N, N);
     m.Init(75, 100, 100, 0, 100, argc, argv);
-
+    m.PrintMatrixInfo();
     pde_solver::data::cpu_distr::Matrix new_m = m.CloneShell();
     //m.PrintAllPartitions();
     //new_m.PrintAllPartitions();
@@ -223,7 +223,7 @@ int main(int argc, char *argv[])
         m = new_m;
         new_m = tmp;
     }
-    //m.PrintMatrixInfo();
+
     // m.Synchronize();
     // m.PrintAllPartitions();
     // m.ShowMatrix();
