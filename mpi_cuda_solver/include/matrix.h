@@ -24,7 +24,12 @@
 #include "base_matrix.h"
 #include "mpi.h"
 #include "math.h"
+#include "device_api.h"
+#include "launch.h"
 #include <array>
+#include <cuda_runtime.h>
+#include <cuda.h>
+#include <omp.h>
 #ifndef MATRIX_H
 #define MATRIX_H
 namespace pde_solver::data::cpu_distr
@@ -36,6 +41,8 @@ namespace pde_solver::data::cpu_distr
      class Matrix : public common::BaseMatrix
      {
      private:
+          MatrixConfiguration matrix_config_;
+
           // number of rows or columns that will serve as the halo of the partition
           int halo_size_;
 
@@ -152,6 +159,13 @@ namespace pde_solver::data::cpu_distr
           Matrix(int halo_size, int width, int height);
 
           /**
+ * @brief Construct a new Matrix object
+ * 
+ * @param config 
+ */
+          Matrix(MatrixConfiguration config);
+
+          /**
      * @brief Initializes the global matrix and a new MPI context
      * 
      * @param value Value to assing to all elements of the matrix
@@ -242,9 +256,36 @@ namespace pde_solver::data::cpu_distr
  */
           double *AssemblePartition();
 
+          /**
+           * @brief Checks if the partition is a partition that contains the top border of the matrix.
+           * 
+           * @return true if the partition contains the top border of the matrix.
+           * @return false if the partition does not contain the top border of the matrix.
+           */
           bool IsTopBorder();
+
+          /**
+           * @brief Checks if the partition is a partition that contains the bottom border of the matrix.
+           * 
+           * @return true if the partition contains the bottom border of the matrix.
+           * @return false if the partition does not contain the bottom border of the matrix.
+           */
           bool IsBottomBorder();
+
+          /**
+           * @brief Checks if the partition is a partition that contains the left border of the matrix.
+           * 
+           * @return true if the partition contains the left border of the matrix.
+           * @return false if the partition does not contain the left border of the matrix.
+           */
           bool IsLeftBorder();
+
+          /**
+           * @brief Checks if the partition is a partition that contains the right border of the matrix.
+           * 
+           * @return true if the partition contains the right border of the matrix.
+           * @return false if the partition does not contain the right border of the matrix.
+           */
           bool IsRightBorder();
 
           void Finalize();

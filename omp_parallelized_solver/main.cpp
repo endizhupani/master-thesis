@@ -4,115 +4,39 @@
 #include <cstdlib>
 #include "cache_helpers.h"
 using namespace std;
-#define N 10
 #define EPSILON 0.01
-#define N_THREADS 8
 #define MAX_ITER 5000
 
 int getChunkSize(int arrayCount, int numElPerLine);
-
-void run_matrix_as_matrix()
-{
-    printf("Running on max %d threads.\nMatrix is stored as a matrix.\nMatrix size: %d rows by %d columns\n", N_THREADS, N, N);
-    omp_set_num_threads(N_THREADS);
-
-    double globalDiff = 500;
-    double mean = 0.0, start, end;
-    auto u = new double[N][N];
-    auto w = new double[N][N];
-    double *tmp;
-
-#pragma omp parallel for default(none) shared(u, w) schedule(static) reduction(+ \
-                                                                               : mean)
-    for (int i = 0; i < N; i++)
-    {
-        u[i][0] = w[i][0] = u[i][N - 1] = w[i][N - 1] = u[0][i] = w[0][i] = 100;
-        u[N - 1][i] = w[N - 1][i] = 0;
-
-        mean += u[i][0] + u[i][N - 1] + u[0][i] + u[N - 1][i];
-    }
-
-    mean /= (4 * N);
-
-#pragma omp parallel for default(none) shared(u) firstprivate(mean) schedule(static)
-    for (int i = 1; i < N - 1; i++)
-    {
-        for (int j = 1; j < N - 1; j++)
-        {
-            u[i][j] = mean;
-        }
-    }
-
-    start = omp_get_wtime();
-    int num_iter = 0;
-
-    while (globalDiff > EPSILON && num_iter < MAX_ITER)
-    {
-        globalDiff = 0.0;
-
-#pragma omp parallel for reduction(max \
-                                   : globalDiff) schedule(static)
-        for (int i = 1; i < N - 1; i++)
-        {
-#pragma omp simd
-            for (int j = 1; j < N - 1; j++)
-            {
-                w[i][j] = 1; //(u[i - 1][j] + u[i + 1][j] + u[i][j - 1] + u[i][j + 1]) / 4;
-                auto diff = fabs(w[i][j] - u[i][j]);
-                if (diff > globalDiff)
-                {
-                    globalDiff = diff;
-                }
-            }
-        }
-
-        swap(w, u);
-        num_iter++;
-    }
-
-    end = omp_get_wtime();
-    for (int i = N - 2; i < N - 1; i++)
-    {
-        for (int j = 0; j < N; j++)
-        {
-            printf("%6.2f ", u[i][j]);
-        }
-        putchar('\n');
-    }
-    printf("time ellapsed = %f\n", end - start);
-    printf("num_iter %d\n", num_iter);
-    delete[] u;
-    delete[] w;
-}
-void run_matrix_as_array()
+void run_matrix_as_array(int size_per_dim)
 {
     int i, j;
     size_t cache_line_size_b = CacheLineSize();
     int dp_per_line = cache_line_size_b / sizeof(double);
     int max_threads = omp_get_max_threads();
-    printf("Running on max %d threads.\nMatrix is stored as an array.\nMatrix size: %d rows by %d columns\nCache line size %zu\n", max_threads, N, N, cache_line_size_b);
+    printf("Running on max %d threads.\nMatrix is stored as an array.\nMatrix size: %d rows by %d columns\nCache line size %zu\n", max_threads, size_per_dim, size_per_dim, cache_line_size_b);
     omp_set_num_threads(max_threads);
     double globalDiff = 500;
     double mean = 0.0;
-    double *u = static_cast<double *>(aligned_alloc(cache_line_size_b, N * N * sizeof(double)));
+    double *u = static_cast<double *>(aligned_alloc(cache_line_size_b, size_per_dim * size_per_dim * sizeof(double)));
 
-    double *w = static_cast<double *>(aligned_alloc(cache_line_size_b, N * N * sizeof(double))); //new double[N * N];
+    double *w = static_cast<double *>(aligned_alloc(cache_line_size_b, size_per_dim * size_per_dim * sizeof(double))); //new double[size_per_dim * size_per_dim];
     double *tmp;
 
-#pragma omp parallel for schedule(static, getChunkSize(N *N, dp_per_line)) default(none) private(i) firstprivate(dp_per_line) shared(u, w) reduction(+ \
-                                                                                                                                                     : mean)
-    for (i = 0; i < N; i++)
+#pragma omp parallel for schedule(static, getChunkSize(size_per_dim *size_per_dim, dp_per_line)) default(none) private(i) firstprivate(dp_per_line, size_per_dim) shared(u, w) reduction(+ \
+                                                                                                                                                                                         : mean)
+    for (i = 0; i < size_per_dim; i++)
     {
-        u[i * N] = u[i * N + (N - 1)] = u[i] = w[i * N] = w[i * N + (N - 1)] = w[i] = 100;
-        u[(N - 1) * N + i] = w[(N - 1) * N + i] = 0;
-        mean += u[i * N] + u[i * N + (N - 1)] + u[i] + u[(N - 1) * N + i];
+        u[i * size_per_dim] = u[i * size_per_dim + (size_per_dim - 1)] = u[i] = w[i * size_per_dim] = w[i * size_per_dim + (size_per_dim - 1)] = w[i] = 100;
+        u[(size_per_dim - 1) * size_per_dim + i] = w[(size_per_dim - 1) * size_per_dim + i] = 0;
+        mean += u[i * size_per_dim] + u[i * size_per_dim + (size_per_dim - 1)] + u[i] + u[(size_per_dim - 1) * size_per_dim + i];
     }
 
-    mean /= (4 * N);
-#pragma omp parallel for schedule(static, getChunkSize(N *N, dp_per_line)) default(none) shared(u) private(i) firstprivate(mean, dp_per_line)
-    for (i = N; i < (N * N) - N; i++)
+    mean /= (4 * size_per_dim);
+#pragma omp parallel for schedule(static, getChunkSize(size_per_dim *size_per_dim, dp_per_line)) default(none) shared(u) private(i) firstprivate(mean, dp_per_line, size_per_dim)
+    for (i = size_per_dim; i < (size_per_dim * size_per_dim) - size_per_dim; i++)
     {
-        if (i % N == 0 || (i - (N - 1)) % N == 0)
+        if (i % size_per_dim == 0 || (i - (size_per_dim - 1)) % size_per_dim == 0)
         {
             continue;
         }
@@ -125,17 +49,17 @@ void run_matrix_as_array()
     {
         globalDiff = 0.0;
 
-#pragma omp parallel for default(none) private(i) firstprivate(u, w, num_iter, dp_per_line) reduction(max \
-                                                                                                      : globalDiff) schedule(static, getChunkSize(N *N, dp_per_line))
+#pragma omp parallel for default(none) private(i) firstprivate(u, w, num_iter, dp_per_line, size_per_dim) reduction(max \
+                                                                                                                    : globalDiff) schedule(static, getChunkSize(size_per_dim *size_per_dim, dp_per_line))
 
-        for (i = N + 1; i < (N * N) - N - 1; i++)
+        for (i = size_per_dim + 1; i < (size_per_dim * size_per_dim) - size_per_dim - 1; i++)
         {
-            if (i % N == 0 || (i - (N - 1)) % N == 0)
+            if (i % size_per_dim == 0 || (i - (size_per_dim - 1)) % size_per_dim == 0)
             {
                 continue;
             }
             auto previous = u[i];
-            w[i] = (u[i - 1] + u[i + 1] + u[i - N] + u[i + N]) / 4;
+            w[i] = (u[i - 1] + u[i + 1] + u[i - size_per_dim] + u[i + size_per_dim]) / 4;
 
             auto currentDifference = fabs(w[i] - previous);
             if (currentDifference > globalDiff)
@@ -156,26 +80,52 @@ void run_matrix_as_array()
     double end = omp_get_wtime();
     printf("time ellapsed = %f\n", end - start);
     printf("num_iter %d\n", num_iter);
-    for (int i = 0; i < N; i++)
-    {
-        for (int j = 0; j < N; j++)
-        {
-            printf("%6.2f ", u[i * N + j]);
-        }
-        putchar('\n');
-    }
+    // for (int i = 0; i < size_per_dim; i++)
+    // {
+    //     for (int j = 0; j < size_per_dim; j++)
+    //     {
+    //         printf("%6.2f ", u[i * size_per_dim + j]);
+    //     }
+    //     putchar('\n');
+    // }
     // delete[] u;
     // delete[] w;
     free(w);
     free(u);
 }
 
-int main()
+void report_num_threads(int level)
 {
-    //run_matrix_as_matrix();
+    printf("Level %d: hello form thread nr: %d\n",
+           level, omp_get_thread_num());
+#pragma omp single
+    {
+        printf("Level %d: number of threads in the team - %d\n",
+               level, omp_get_num_threads());
+    }
+}
 
-    //printf("======================================\n");
-    run_matrix_as_array();
+int main(int argc, char *argv[])
+{
+    // if (argc <= 1)
+    // {
+    //     printf("Please enter the size of the matrix\n");
+    //     return 1;
+    // }
+    // //run_matrix_as_matrix();
+
+    // //printf("======================================\n");
+    // run_matrix_as_array(atoi(argv[1]));
+    omp_set_nested(2);
+#pragma omp parallel num_threads(2)
+    {
+        report_num_threads(1);
+
+#pragma omp parallel num_threads(4)
+        {
+            report_num_threads(2);
+        }
+    }
 }
 
 int getChunkSize(int arrayCount, int numElPerLine)

@@ -24,6 +24,48 @@
 #include <iostream>
 #ifndef COMMON_H
 #define COMMON_H
+
+#ifdef __CUDACC__
+/**
+ * \brief Macro for function type qualifiers __host__ __device__.
+ *
+ * Macro for function type qualifiers __host__ __device__. This macro is only
+ * define when compiled with the Nvidia C compiler nvcc because ordinary C/C++
+ * compiler will complain about function type qualifiers.
+ */
+#define MSL_USERFUNC __host__ __device__
+/**
+ * \brief Macro for function type qualifier __device__.
+ *
+ * Macro for function type qualifier __device__. This macro is only
+ * define when compiled with the Nvidia C compiler nvcc because ordinary C/C++
+ * compiler will complain about function type qualifiers.
+ */
+#define MSL_GPUFUNC __device__
+/**
+ * \brief Macro for function type qualifier __host__.
+ *
+ * Macro for function type qualifier __host__. This macro is only
+ * define when compiled with the Nvidia C compiler nvcc because ordinary C/C++
+ * compiler will complain about function type qualifiers.
+ */
+#define MSL_CPUFUNC __host__
+/**
+ * \brief This macro checks return value of the CUDA runtime call and exits
+ *        the application if the call failed.
+ */
+#define CUDA_CHECK_RETURN(value)                                          \
+    {                                                                     \
+        cudaError_t _m_cudaStat = value;                                  \
+        if (_m_cudaStat != cudaSuccess)                                   \
+        {                                                                 \
+            fprintf(stderr, "Error %s at line %d in file %s\n",           \
+                    cudaGetErrorString(_m_cudaStat), __LINE__, __FILE__); \
+            exit(EXIT_FAILURE);                                           \
+        }                                                                 \
+    }
+#endif
+
 /**
  * @brief The type of the partition neighbour
  * 
@@ -57,6 +99,22 @@ public:
 
         return std::to_string(id);
     }
+};
+
+struct MatrixConfiguration
+{
+public:
+    int left_border;
+    int right_border;
+    int top_border;
+    int bottom_border;
+    int inner_value;
+
+    int gpu_number;
+    int n_rows;
+    int n_cols;
+    int requested_num_threads;
+    int granted_num_threads;
 };
 
 #endif // !COMMON_H
