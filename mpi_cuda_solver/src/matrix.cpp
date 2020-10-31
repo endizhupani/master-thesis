@@ -21,9 +21,9 @@
  */
 
 #include "matrix.h"
-namespace pde_solver::data::cpu_distr
+namespace pde_solver
 {
-    Matrix::Matrix(int halo_size, int width, int height) : pde_solver::data::common::BaseMatrix(width, height)
+    Matrix::Matrix(int halo_size, int width, int height) : pde_solver::common::BaseMatrix(width, height)
     {
         this->halo_size_ = halo_size;
         this->is_initialized_ = false;
@@ -33,7 +33,7 @@ namespace pde_solver::data::cpu_distr
         }
     }
 
-    Matrix::Matrix(MatrixConfiguration config) : pde_solver::data::common::BaseMatrix(config.n_cols, config.n_rows)
+    Matrix::Matrix(MatrixConfiguration config) : pde_solver::common::BaseMatrix(config.n_cols, config.n_rows)
     {
         this->matrix_config_ = config;
         this->halo_size_ = 1;
@@ -309,10 +309,8 @@ namespace pde_solver::data::cpu_distr
         if (this->proc_id_ == 0)
         {
             printf("Number of processes: %d\n", this->proc_count_);
-            int deviceCount = 0;
-            checkCuda(cudaGetDeviceCount(&deviceCount));
-
-            printf("Number of GPUs: %d\n", deviceCount);
+            // int deviceCount = 0;
+            // printf("Number of GPUs: %d\n", deviceCount);
         }
         MPI_Barrier(this->GetCartesianCommunicator());
         std::cout << "Processor id: " << this->proc_id_ << "; Coordinates: (" << this->partition_coords_[0] << ", " << this->partition_coords_[1] << "); Top ID: " << this->neighbours[0].GetNeighborId() << "; Right ID: " << this->neighbours[1].GetNeighborId() << "; Bottom ID: " << this->neighbours[2].GetNeighborId() << "; Left ID: " << this->neighbours[3].GetNeighborId() << "Partition size: " << this->partition_width_ << "x" << this->partition_height_ << std::endl;
@@ -393,7 +391,6 @@ namespace pde_solver::data::cpu_distr
 
         // 4 sends and 4 receives
         MPI_Request requests[8];
-        //double border_differences[4];
 
         // Two levels of parallelization
         omp_set_nested(2);
@@ -860,5 +857,4 @@ namespace pde_solver::data::cpu_distr
     {
         return this->partition_coords_[1] == this->right_grid_border_coord_;
     }
-
-} // namespace pde_solver::data::cpu_distr
+} // namespace pde_solver

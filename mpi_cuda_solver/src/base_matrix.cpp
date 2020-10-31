@@ -23,7 +23,7 @@
 #include "base_matrix.h"
 #include <iostream>
 
-namespace pde_solver::data::common
+namespace pde_solver::common
 {
     BaseMatrix::BaseMatrix(int width, int height)
     {
@@ -34,4 +34,4 @@ namespace pde_solver::data::common
     BaseMatrix::~BaseMatrix()
     {
     }
-} // namespace pde_solver::data::common
+} // namespace pde_solver::common

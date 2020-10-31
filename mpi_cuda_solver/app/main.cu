@@ -1,5 +1,5 @@
 #include "cache_helpers.h"
-#include "hemi.h"
+//#include "hemi.h"
 #include <cstdlib>
 #include <iostream>
 #include <math.h>
@@ -25,10 +25,10 @@ int main(int argc,
   printf("works\n");
 #endif // __CUDACC__
 
-  pde_solver::data::cpu_distr::Matrix m(1, N, N);
+  pde_solver::Matrix m(1, N, N);
   m.Init(75, 100, 100, 0, 100, argc, argv);
   m.PrintMatrixInfo();
-  pde_solver::data::cpu_distr::Matrix new_m = m.CloneShell();
+  pde_solver::Matrix new_m = m.CloneShell();
   int num_iter = 0;
   double global_diff = 10;
   double tot_loop_time = 0;
@@ -42,7 +42,7 @@ int main(int argc,
       global_diff = m.GlobalDifference();
     }
 
-    pde_solver::data::cpu_distr::Matrix tmp = m;
+    pde_solver::Matrix tmp = m;
     m = new_m;
     new_m = tmp;
     num_iter++;

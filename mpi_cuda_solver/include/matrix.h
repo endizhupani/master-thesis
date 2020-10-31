@@ -24,15 +24,15 @@
 #include "base_matrix.h"
 #include "mpi.h"
 #include "math.h"
-#include "device_api.h"
-#include "launch.h"
+//#include "device_api.h"
+//#include "launch.h"
 #include <array>
 #include <cuda_runtime.h>
 #include <cuda.h>
 #include <omp.h>
 #ifndef MATRIX_H
 #define MATRIX_H
-namespace pde_solver::data::cpu_distr
+namespace pde_solver
 {
      /**
  * @brief Class that defines a distributed matrix that is partitioned in blocks and distributed with MPI to multiple processors
@@ -308,6 +308,6 @@ namespace pde_solver::data::cpu_distr
           MPI_Comm GetCartesianCommunicator();
 #pragma endregion
      };
+} // namespace pde_solver
 
-} // namespace pde_solver::data::cpu_distr
 #endif // !MATRIX_H

@@ -23,7 +23,7 @@
  * @brief Common data objects and behavior
  * 
  */
-namespace pde_solver::data::common
+namespace pde_solver::common
 {
 #ifndef BASE_MATRIX_H
 #define BASE_MATRIX_H
@@ -90,4 +90,4 @@ namespace pde_solver::data::common
     };
 #endif // !BASE_MATRIX_H
 
-} // namespace pde_solver::data::common
+} // namespace pde_solver::common
