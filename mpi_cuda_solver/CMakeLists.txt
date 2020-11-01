@@ -40,7 +40,7 @@
 # ================================================ Version that works with Palma =======================================================
 
 cmake_minimum_required (VERSION 3.10.2)
-set(CMAKE_VERBOSE_MAKEFILE ON)
+set(CMAKE_VERBOSE_MAKEFILE ON) 
 set(project_name mpi_cuda_solver)
 project(${project_name})
 enable_language(CUDA CXX)

@@ -104,17 +104,52 @@ public:
 struct MatrixConfiguration
 {
 public:
-    int left_border;
-    int right_border;
-    int top_border;
-    int bottom_border;
-    int inner_value;
-
     int gpu_number;
     int n_rows;
     int n_cols;
-    int requested_num_threads;
-    int granted_num_threads;
+    double cpu_perc;
+};
+
+struct ExecutionStats
+{
+public:
+    double total_border_calc_time;
+    double total_inner_points_time;
+    double total_idle_comm_time;
+    double total_sweep_time;
+    double total_time_reducing_difference;
+    int n_diff_reducions;
+    int n_sweeps;
+
+    void print_to_console()
+    {
+        if (n_sweeps == 0)
+        {
+            n_sweeps = 1;
+        }
+
+        if (n_diff_reducions == 0)
+        {
+            n_diff_reducions = 1;
+        }
+        printf("Total time spent executing Jacobi Iterations: %f\n\
+        Total time executing border point calculations: %f\n\
+        Total time executing inner point calculations: %f\n\
+        Total time waiting for communication to finish: %f\n\
+        Total time reducing and exchanging the global difference: %f\n\
+        Avg time spent executing Jacobi Iterations: %f\n\
+        Avg time executing border point calculations: %f\n\
+        Avg time executing inner point calculations: %f\n\
+        Avg time waiting for communication to finish: %f\n\
+        Avg time reducing and exchanging the global difference: %f\n\
+        Number of iterations: %d\n\
+        Number of difference reductions: %d\n",
+               total_sweep_time, total_border_calc_time, total_inner_points_time, total_idle_comm_time, total_time_reducing_difference, (total_sweep_time / n_sweeps), (total_border_calc_time / n_sweeps), (total_inner_points_time / n_sweeps), (total_idle_comm_time / n_sweeps), (total_time_reducing_difference / n_diff_reducions), n_sweeps, n_diff_reducions);
+    }
+
+    void print_to_file(char *file_path)
+    {
+    }
 };
 
 #endif // !COMMON_H

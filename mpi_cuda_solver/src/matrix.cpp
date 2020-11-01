@@ -23,7 +23,7 @@
 #include "matrix.h"
 namespace pde_solver
 {
-    Matrix::Matrix(int halo_size, int width, int height) : pde_solver::common::BaseMatrix(width, height)
+    Matrix::Matrix(int halo_size, int width, int height) : pde_solver::BaseMatrix(width, height)
     {
         this->halo_size_ = halo_size;
         this->is_initialized_ = false;
@@ -33,7 +33,7 @@ namespace pde_solver
         }
     }
 
-    Matrix::Matrix(MatrixConfiguration config) : pde_solver::common::BaseMatrix(config.n_cols, config.n_rows)
+    Matrix::Matrix(MatrixConfiguration config) : pde_solver::BaseMatrix(config.n_cols, config.n_rows)
     {
         this->matrix_config_ = config;
         this->halo_size_ = 1;
@@ -212,7 +212,6 @@ namespace pde_solver
 
         if (this->matrix_width_ % this->processes_per_dimension_[1] != 0)
         {
-
             throw new std::logic_error("The width of the matrix must be divisable by the number of processes along the x dimension: " + std::to_string(this->processes_per_dimension_[0]));
         }
 
@@ -382,7 +381,7 @@ namespace pde_solver
         }
     }
 
-    double Matrix::LocalSweep(Matrix new_matrix)
+    double Matrix::LocalSweep(Matrix new_matrix, ExecutionStats *execution_stats)
     {
         this->current_max_difference_ = 0;
         double diff, new_value;
@@ -394,7 +393,8 @@ namespace pde_solver
 
         // Two levels of parallelization
         omp_set_nested(2);
-
+        auto sweep_start = MPI_Wtime();
+        auto border_start = MPI_Wtime();
 #pragma omp parallel sections firstprivate(diff, new_value, max_thread_num) num_threads(std::min(max_thread_num, 4)) reduction(max \
                                                                                                                                : current_max_difference_)
         {
@@ -558,7 +558,9 @@ namespace pde_solver
                 }
             }
         }
+        execution_stats->total_border_calc_time += (MPI_Wtime() - border_start);
 
+        auto inner_points_time = MPI_Wtime();
 #pragma omp parallel reduction(max \
                                : current_max_difference_)
         {
@@ -576,7 +578,14 @@ namespace pde_solver
                     new_matrix.SetLocal(new_value, i, j);
                 }
         }
+
+        execution_stats->total_inner_points_time += (MPI_Wtime() - inner_points_time);
+
+        auto idle_start = MPI_Wtime();
         MPI_Waitall(8, requests, MPI_STATUSES_IGNORE);
+        execution_stats->total_idle_comm_time += (MPI_Wtime() - idle_start);
+        execution_stats->total_sweep_time += (MPI_Wtime() - sweep_start);
+        execution_stats->n_sweeps += 1;
         return current_max_difference_;
     }
 
@@ -684,10 +693,15 @@ namespace pde_solver
         this->SetLocal(value, local_row, local_col);
     }
 
-    const double Matrix::GlobalDifference()
+    const double Matrix::GlobalDifference(ExecutionStats *execution_stats)
     {
         MPI_Barrier(this->GetCartesianCommunicator());
-        MPI_Allreduce(&current_max_difference_, &current_max_difference_, 1, MPI_DOUBLE, MPI_MAX, this->GetCartesianCommunicator());
+        auto reduction_start = MPI_Wtime();
+        double received_difference = 0;
+        MPI_Allreduce(&current_max_difference_, &received_difference, 1, MPI_DOUBLE, MPI_MAX, this->GetCartesianCommunicator());
+        current_max_difference_ = received_difference;
+        execution_stats->total_time_reducing_difference += (MPI_Wtime() - reduction_start);
+        execution_stats->n_diff_reducions += 1;
         return current_max_difference_;
     }
 

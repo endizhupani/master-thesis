@@ -1,4 +1,5 @@
 #include "cache_helpers.h"
+#include "common.h"
 //#include "hemi.h"
 #include <cstdlib>
 #include <iostream>
@@ -7,7 +8,6 @@
 #include <omp.h>
 
 using namespace std;
-#define N 1000
 #define EPSILON 0.01
 #define N_THREADS 8
 #define MAX_ITER 5000
@@ -15,31 +15,40 @@ using namespace std;
 int getChunkSize(int arrayCount, int numElPerLine);
 
 int main(int argc,
-         char *argv[]) { // matrix size, num threads per process, cpu percentage
+         char *argv[]) { // matrix size, cpu percentage
 
-#ifdef __CUDACC__
+  if (argc <= 2) {
+    printf("Please enter the matrix size and the percentage of data that "
+           "should remain in the CPU.");
+  }
   int deviceCount = 0;
+#ifdef __CUDACC__
+
   CUDA_CHECK_RETURN(cudaGetDeviceCount(&deviceCount));
 
   printf("Number of GPUs: %d\n", deviceCount);
-  printf("works\n");
 #endif // __CUDACC__
-
-  pde_solver::Matrix m(1, N, N);
+  MatrixConfiguration conf = {deviceCount, atoi(argv[1]), atoi(argv[1]),
+                              atof(argv[2])};
+  printf("GOT HERE\n\n\n");
+  pde_solver::Matrix m(conf);
+  printf("GOT HERE12\n\n\n");
   m.Init(75, 100, 100, 0, 100, argc, argv);
-  m.PrintMatrixInfo();
+  printf("GOT HERE13\n\n\n");
   pde_solver::Matrix new_m = m.CloneShell();
   int num_iter = 0;
   double global_diff = 10;
-  double tot_loop_time = 0;
-  double calc_start = MPI_Wtime();
+  ExecutionStats stats = {0.0, 0.0, 0.0, 0.0, 0.0, 0, 0};
+  printf("GOT HERE1\n\n\n");
+  // double tot_loop_time = 0;
+  // double calc_start = MPI_Wtime();
   while (global_diff > EPSILON && num_iter < MAX_ITER) {
 
-    double t = MPI_Wtime();
-    m.LocalSweep(new_m);
-    tot_loop_time += (MPI_Wtime() - t);
+    // double t = MPI_Wtime();
+    m.LocalSweep(new_m, &stats);
+    // tot_loop_time += (MPI_Wtime() - t);
     if (num_iter % 4 == 0) {
-      global_diff = m.GlobalDifference();
+      global_diff = m.GlobalDifference(&stats);
     }
 
     pde_solver::Matrix tmp = m;
@@ -47,10 +56,13 @@ int main(int argc,
     new_m = tmp;
     num_iter++;
   }
-  double calc_time = MPI_Wtime() - calc_start;
+  printf("GOT HERE2\n\n\n");
+  stats.print_to_console();
+  printf("GOT HERE3\n\n\n");
+  // double calc_time = MPI_Wtime() - calc_start;
 
-  printf("AVG sweep time: %f\n", (tot_loop_time / num_iter));
-  printf("Total Calculaiton time: %f\n", calc_time);
+  // printf("AVG sweep time: %f\n", (tot_loop_time / num_iter));
+  // printf("Total Calculaiton time: %f\n", calc_time);
 
   // m.Synchronize();
   // m.PrintAllPartitions();

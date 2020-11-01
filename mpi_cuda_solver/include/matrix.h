@@ -38,7 +38,7 @@ namespace pde_solver
  * @brief Class that defines a distributed matrix that is partitioned in blocks and distributed with MPI to multiple processors
  * 
  */
-     class Matrix : public common::BaseMatrix
+     class Matrix : public BaseMatrix
      {
      private:
           MatrixConfiguration matrix_config_;
@@ -212,14 +212,14 @@ namespace pde_solver
      * 
      * @return double Maximum difference between the new and the old values
      */
-          double LocalSweep(Matrix newMatrix);
+          double LocalSweep(Matrix newMatrix, ExecutionStats *execution_stats);
 
           /**
      * @brief Gets the global max difference by performing a reduction operation for all processors
      * 
      * @return double Global max difference
      */
-          const double GlobalDifference();
+          const double GlobalDifference(ExecutionStats *execution_stats);
 
           /**
      * @brief Prints information about the current partition.

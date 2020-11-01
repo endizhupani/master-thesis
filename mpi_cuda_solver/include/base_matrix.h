@@ -19,14 +19,16 @@
  * DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
+
+#ifndef BASE_MATRIX_H
+#define BASE_MATRIX_H
 /**
  * @brief Common data objects and behavior
  * 
  */
-namespace pde_solver::common
+
+namespace pde_solver
 {
-#ifndef BASE_MATRIX_H
-#define BASE_MATRIX_H
     /**
      * @brief Base matrix class with common behavior used by all types of 2D matrix configurations.
      * 
@@ -88,6 +90,6 @@ namespace pde_solver::common
          */
         virtual void ShowMatrix() = 0;
     };
-#endif // !BASE_MATRIX_H
+} // namespace pde_solver
 
-} // namespace pde_solver::common
+#endif // !BASE_MATRIX_H
