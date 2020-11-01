@@ -27,6 +27,7 @@
 //#include "device_api.h"
 //#include "launch.h"
 #include <array>
+#include <vector>
 #include <cuda_runtime.h>
 #include <cuda.h>
 #include <omp.h>
@@ -102,6 +103,7 @@ namespace pde_solver
           // points taht are used by the stencil calcuation of the points in the right border of the partition
           double *right_ghost_points_;
 
+          std::vector<cudaStream_t> border_calc_streams;
           double initial_inner_value_;
           double initial_left_value_;
           double initial_right_value_;

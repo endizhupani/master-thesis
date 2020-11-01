@@ -414,9 +414,16 @@ namespace pde_solver
                         new_matrix.SetLocal(new_value, 0, 0);
                     }
 
+                    int gpu_start = (int)ceil((double)this->partition_height_ * this->matrix_config_.cpu_perc) + 1;
+                    int gpu_end = this->partition_height_ - 2; // last index of the elements to be processed by the GPU.
+                    cudaStream_t streams[this->matrix_config_.gpu_number];
+                    if (gpu_start <= gpu_end)
+                    {
+                    }
+
 #pragma omp parallel for reduction(max \
                                    : current_max_difference_)
-                    for (int i = 1; i < this->partition_height_ - 1; i++)
+                    for (int i = 1; i < gpu_start; i++)
                     {
                         new_value = (this->GetLocal(i - 1, 0) + this->GetLocal(i + 1, 0) + this->left_ghost_points_[i] + this->GetLocal(i, 1)) / 4;
                         diff = fabs(new_value - this->GetLocal(i, 0));
