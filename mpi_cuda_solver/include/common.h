@@ -22,6 +22,7 @@
 #include "mpi.h"
 #include <string>
 #include <iostream>
+#include "cuda.h"
 #ifndef COMMON_H
 #define COMMON_H
 
@@ -108,6 +109,16 @@ public:
     int n_rows;
     int n_cols;
     double cpu_perc;
+};
+
+struct GPUStream
+{
+public:
+    // The device number on which the stream is allocated.
+    int gpu_id;
+
+    // The stream created on the gpu
+    cudaStream_t stream;
 };
 
 struct ExecutionStats

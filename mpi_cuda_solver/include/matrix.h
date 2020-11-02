@@ -103,7 +103,12 @@ namespace pde_solver
           // points taht are used by the stencil calcuation of the points in the right border of the partition
           double *right_ghost_points_;
 
-          std::vector<cudaStream_t> border_calc_streams;
+          // Streams for the border calculations. each of the 4 streams are for the left, top, right and bottom borders in that order
+          GPUStream border_calc_streams[4];
+
+          // Streams that will be used do calculate the inner data of the partition. There will be one stream per GPU. This needs to be a vector because the number of GPUs is not known in advance.
+          std::vector<GPUStream> inner_data_streams;
+
           double initial_inner_value_;
           double initial_left_value_;
           double initial_right_value_;
@@ -146,6 +151,8 @@ namespace pde_solver
  * @param top_border_value 
  */
           void InitRightBorderAndGhost(double inner_value, double right_border_value, double bottom_border_value, double top_border_value);
+
+          void ConfigGpuExecution();
 
           void AllocateMemory();
 

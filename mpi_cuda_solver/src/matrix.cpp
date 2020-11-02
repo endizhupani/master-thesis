@@ -181,6 +181,43 @@ namespace pde_solver
         this->Init(value, value, value, value, value, argc, argv);
     }
 
+    void Matrix::ConfigGpuExecution()
+    {
+        // there must be one stream per border. Each stream can be in one GPU or one GPU can have multiple streams in case the
+        int current_device = 0;
+        for (int i = 0; i < 4; i++)
+        {
+
+            cudaSetDevice(current_device);
+            border_calc_streams[i].gpu_id = current_device;
+            cudaStreamCreate(&(border_calc_streams[i].stream));
+
+            // The stream is created for a border that is NOT also a matrix border which means that the calculation will be performed.
+            // In this case, if possible, the device should be changed.
+            if ((i == 0 && !this->IsLeftBorder()) ||
+                (i == 1 && !this->IsTopBorder()) ||
+                (i == 2 && !this->IsRightBorder()) ||
+                (i == 3 && !this->IsBottomBorder()))
+            {
+                current_device++;
+                if (current_device == this->matrix_config_.gpu_number)
+                {
+                    // Return back to the first device if we were on the last device.
+                    current_device = 0;
+                }
+            }
+        }
+
+        // configure inner data streams
+        for (int i = 0; i < this->matrix_config_.gpu_number; i++)
+        {
+            cudaSetDevice(i);
+            cudaStream_t stream;
+            cudaStreamCreate(&stream);
+            this->inner_data_streams.push_back({i, stream});
+        }
+    }
+
     void Matrix::Deallocate()
     {
         delete[] left_ghost_points_;
@@ -226,7 +263,7 @@ namespace pde_solver
         // This is the partition height without the ghost points.
         this->partition_height_ = this->matrix_height_ / this->processes_per_dimension_[0];
         this->InitData(inner_value, left_border_value, right_border_value, bottom_border_value, top_border_value);
-
+        this->ConfigGpuExecution();
         MPI_Barrier(this->GetCartesianCommunicator());
     }
 
@@ -416,7 +453,7 @@ namespace pde_solver
 
                     int gpu_start = (int)ceil((double)this->partition_height_ * this->matrix_config_.cpu_perc) + 1;
                     int gpu_end = this->partition_height_ - 2; // last index of the elements to be processed by the GPU.
-                    cudaStream_t streams[this->matrix_config_.gpu_number];
+                    //cudaStream_t streams[this->matrix_config_.gpu_number];
                     if (gpu_start <= gpu_end)
                     {
                     }
