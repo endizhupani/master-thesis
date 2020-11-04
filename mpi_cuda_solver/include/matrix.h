@@ -106,6 +106,12 @@ namespace pde_solver
           float *left_border_inner_halo;
           float *right_border_inner_halo;
 
+          // three columns on the left side of the matrix. They hold the left border, the left ghost points and the inner halo for the left border. The are 2 elements taller to hold the top and bottom halo for the border region
+          float *left_region;
+
+          // three columns on the right side of the matrix. They hold the right border, the right ghost points and the inner halo for the right border
+          float *right_region;
+
           // Streams for the border calculations. each of the 4 streams are for the left, top, right and bottom borders in that order
           GPUStream border_calc_streams[4];
 

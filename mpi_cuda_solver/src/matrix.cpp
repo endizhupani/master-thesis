@@ -157,20 +157,19 @@ namespace pde_solver
         // Inner data
         for (int i = 1; i < inner_data_height - 1; i++)
         {
-            int offset = i * inner_data_width;
             for (int j = 1; j < inner_data_width - 1; j++)
             {
                 if (this->IsTopBorder() && i == 1)
                 {
-                    this->inner_points_[offset + j] = top_border_value;
+                    this->SetLocal(top_border_value, i, j);
                 }
                 else if (this->IsBottomBorder() && i == (inner_data_height - 2))
                 {
-                    this->inner_points_[offset + j] = bottom_border_value;
+                    this->SetLocal(bottom_border_value, i, j);
                 }
                 else
                 {
-                    this->inner_points_[offset + j] = inner_value;
+                    this->SetLocal(inner_value, i, j);
                 }
             }
         }
@@ -220,18 +219,11 @@ namespace pde_solver
 
     void Matrix::Deallocate()
     {
-        cudaFreeHost(&left_ghost_points_);
-        cudaFreeHost(&right_ghost_points_);
-        cudaFreeHost(&left_border_);
-        cudaFreeHost(&right_border_);
-        cudaFreeHost(&inner_points_);
-        // delete[] left_ghost_points_;
-        // delete[] right_ghost_points_;
-        // delete[] left_border_;
-        // delete[] right_border_;
-        // delete[] inner_points_;
+        cudaFreeHost(&left_region);
+        cudaFreeHost(&right_region);
 
-        // TODO (endizhupani@uni-muenster.de): free device data
+        cudaFreeHost(&inner_points_);
+
         for (int i = 0; i < 4; i++)
         {
             cudaFree(this->border_calc_streams[i].d_data);
@@ -253,22 +245,22 @@ namespace pde_solver
         int inner_data_width = this->partition_width_;       //(this->partition_width_ - 2);
         int inner_data_height = this->partition_height_ + 2; // Two extra rows to hold the top and bottom halo
                                                              // this->inner_points_ = new float[inner_data_height * inner_data_width]; // Since the left and right borders of the partitions are stored separately, there is no need to store them on teh inner points array.
+        int side_region_height = this->partition_height_ + 2 * this->halo_size_;
+        int side_region_width = 1 + 2 * this->halo_size_;
         cudaMallocHost(&(this->inner_points_), inner_data_height * inner_data_width * sizeof(float));
-        cudaMallocHost(&(this->left_border_), this->partition_height_ * sizeof(float));
-        cudaMallocHost(&(this->left_ghost_points_), this->partition_height_ * sizeof(float));
-        cudaMallocHost(&(this->left_border_inner_halo), this->partition_height_ * sizeof(float));
-        cudaMallocHost(&(this->right_border_), this->partition_height_ * sizeof(float));
-        cudaMallocHost(&(this->right_ghost_points_), this->partition_height_ * sizeof(float));
-        cudaMallocHost(&(this->right_border_inner_halo), this->partition_height_ * sizeof(float));
+        cudaMallocHost(&(this->left_region), side_region_height * side_region_width * sizeof(float));
+        cudaMallocHost(&(this->right_region), side_region_height * side_region_width * sizeof(float));
 
-        // this->left_border_ = new float[this->partition_height_];
-        // this->left_ghost_points_ = new float[this->partition_height_];
-        // this->right_border_ = new float[this->partition_height_];
-        // this->right_ghost_points_ = new float[this->partition_height_];
+        this->left_border_ = &(this->left_region[side_region_height + 1]);
+        this->left_ghost_points_ = &(this->left_region[1]);
+        this->left_border_inner_halo = &(this->left_region[2 * side_region_height + 1]);
+        this->right_border_ = &(this->right_region[side_region_height + 1]);
+        this->right_ghost_points_ = &(this->right_region[1]);
+        this->right_border_inner_halo = &(this->right_region[2 * side_region_height + 1]);
         this->top_ghost = &this->inner_points_[0];
         this->bottom_ghost = &this->inner_points_[(inner_data_height - 1) * inner_data_width];
 
-        float *inner_points;
+        //float *inner_points;
 
         int inner_rows = this->partition_height_ - 2;
 
@@ -288,10 +280,14 @@ namespace pde_solver
                 throw new std::logic_error("Memory allocation failed");
             }
             rows_allocated += rows_per_gpu;
+            this->inner_data_streams[i].gpu_start_row_ = inner_rows - rows_allocated;
         }
 
         cudaSetDevice(this->inner_data_streams[this->matrix_config_.gpu_number - 1].gpu_id);
-        err = cudaMalloc(&(this->inner_data_streams[this->matrix_config_.gpu_number - 1].d_data), ((gpu_rows - rows_allocated) + 2) * this->partition_width_ * sizeof(float));
+        int remaining_gpu_rows = (gpu_rows - rows_allocated);
+        rows_allocated += remaining_gpu_rows;
+        this->inner_data_streams[this->matrix_config_.gpu_number - 1].gpu_start_row_ = inner_rows - rows_allocated;
+        err = cudaMalloc(&(this->inner_data_streams[this->matrix_config_.gpu_number - 1].d_data), (remaining_gpu_rows + 2) * this->partition_width_ * sizeof(float));
         if (err != cudaSuccess)
         {
             this->Finalize();
@@ -364,9 +360,9 @@ namespace pde_solver
         MPI_Barrier(this->GetCartesianCommunicator());
     }
 
-    void Matrix::InitLeftBorderAndGhost(float inner_value, float left_border_value, float bottom_border_value, float top_border_value)
+    void Matrix::
+        InitLeftBorderAndGhost(float inner_value, float left_border_value, float bottom_border_value, float top_border_value)
     {
-
         // assing the left border values. If the partition is on the border of the cartesian grid,
         // the left border values should receive the values from the parameter 'left_border_value'
 
@@ -375,7 +371,6 @@ namespace pde_solver
             for (int i = 0; i < this->partition_height_; i++)
             {
                 SetLocal(left_border_value, i, 0);
-                //left_border_[i] = left_border_value;
             }
 
             return;
@@ -385,10 +380,7 @@ namespace pde_solver
         if (this->IsTopBorder())
         {
             SetLocal(top_border_value, start, 0);
-            //
-            //this->left_border_[start] = top_border_value;
             this->left_ghost_points_[start] = top_border_value;
-            this->left_border_inner_halo[start] = top_border_value;
             start++;
         }
 
@@ -397,14 +389,12 @@ namespace pde_solver
         {
             SetLocal(bottom_border_value, end, 0);
             this->left_ghost_points_[end] = bottom_border_value;
-            this->left_border_inner_halo[end] = bottom_border_value;
             end--;
         }
         for (int i = start; i <= end; i++)
         {
             SetLocal(inner_value, i, 0);
             this->left_ghost_points_[i] = inner_value;
-            this->left_border_inner_halo[start] = inner_value;
         }
     }
 
@@ -425,7 +415,7 @@ namespace pde_solver
         if (this->IsTopBorder())
         {
             SetLocal(top_border_value, start, 0);
-            this->right_border_inner_halo[start] = top_border_value;
+            this->right_ghost_points_[start] = top_border_value;
             start++;
         }
 
@@ -434,13 +424,11 @@ namespace pde_solver
         {
             SetLocal(bottom_border_value, end, 0);
             this->right_ghost_points_[end] = bottom_border_value;
-            this->right_border_inner_halo[end] = bottom_border_value;
             end--;
         }
         for (int i = start; i <= end; i++)
         {
             SetLocal(inner_value, i, 0);
-            this->right_border_inner_halo[i] = inner_value;
             this->right_ghost_points_[i] = inner_value;
         }
     }
@@ -556,13 +544,13 @@ namespace pde_solver
                         new_matrix.SetLocal(new_value, 0, 0);
                     }
 
-                    int gpu_start = (int)ceil((float)this->partition_height_ * this->matrix_config_.cpu_perc) + 1;
-                    int gpu_end = this->partition_height_ - 2; // last index of the elements to be processed by the GPU.
+                    // int gpu_start = (int)ceil((float)this->partition_height_ * this->matrix_config_.cpu_perc) + 1;
+                    // int gpu_end = this->partition_height_ - 2; // last index of the elements to be processed by the GPU.
                     //cudaStream_t streams[this->matrix_config_.gpu_number];
-                    if (gpu_start <= gpu_end)
-                    {
-                        // TODO (endizhupani@uni-muenster.de): Start the GPU Computation
-                    }
+                    // if (gpu_start <= gpu_end)
+                    // {
+                    //     // TODO (endizhupani@uni-muenster.de): Start the GPU Computation
+                    // }
 
 #pragma omp parallel for reduction(max \
                                    : current_max_difference_)
@@ -792,16 +780,6 @@ namespace pde_solver
             return;
         }
 
-        if (col == 1)
-        {
-            this->left_border_inner_halo[row] = value;
-        }
-
-        if (col == this->partition_width_ - 2)
-        {
-            this->left_border_inner_halo[row] = value;
-        }
-
         if (col == this->partition_width_ - 1)
         {
             this->right_border_[row] = value;
@@ -812,6 +790,16 @@ namespace pde_solver
             // }
 
             return;
+        }
+
+        if (col == 1)
+        {
+            this->left_border_inner_halo[row] = value;
+        }
+
+        if (col == this->partition_width_ - 2)
+        {
+            this->left_border_inner_halo[row] = value;
         }
 
         this->inner_points_[(row + 1) * this->partition_width_ + col] = value;

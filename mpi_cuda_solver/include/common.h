@@ -96,6 +96,8 @@ public:
     cudaStream_t stream;
 
     float *d_data;
+
+    int gpu_start_row_;
 };
 
 struct ExecutionStats
