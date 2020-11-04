@@ -42,13 +42,13 @@ namespace pde_solver
         // global matrix height
         int matrix_height_;
         // array that holds the left border of the partition
-        double *left_border_;
+        float *left_border_;
 
         // array that holds the right border of the partition
-        double *right_border_;
+        float *right_border_;
 
         // array holding the inner points of the matrix as well as the top and bottom border
-        double *inner_points_;
+        float *inner_points_;
 
     public:
         /**
@@ -70,7 +70,7 @@ namespace pde_solver
          * 
          * @param value Value to assign to the elements of the matrix
          */
-        void Init(double value);
+        void Init(float value);
 
         /**
          * @brief Initializes the matrix with specific values on borders and another value for all the inner elements.
@@ -81,12 +81,12 @@ namespace pde_solver
          * @param bottom_border_value Value to be assigned to the bottom border of the global matrix
          * @param top_border_value Value to be assigned to the top border of the global matrix
          */
-        void Init(double inner_value, double left_border_value, double right_border_value, double bottom_border_value, double top_border_value);
+        void Init(float inner_value, float left_border_value, float right_border_value, float bottom_border_value, float top_border_value);
 
         /**
          * @brief gets the matrix contents
          * 
-         * @return double* the matrix stored as an array
+         * @return float* the matrix stored as an array
          */
         virtual void ShowMatrix() = 0;
     };

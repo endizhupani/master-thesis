@@ -81,7 +81,7 @@ namespace pde_solver
           MPI_Comm cartesian_communicator_;
 
           // The max difference calculated after a Jacobian sweep operation
-          double current_max_difference_;
+          float current_max_difference_;
 
           // Number of processes in each dimension. The first element determines the number processes along the vertical dimension the second, the number of processes along the horizontal dimension.
           int processes_per_dimension_[2];
@@ -92,28 +92,31 @@ namespace pde_solver
           int top_grid_border_coord_;
 
           // Pointer to the final row of inner_data
-          double *bottom_ghost;
+          float *bottom_ghost;
 
           // Pointer to the first row of the inner_data. Technically inner_data can be used with the same result but this was supplied for completeness.
-          double *top_ghost;
+          float *top_ghost;
 
           // points that are used by the stencil calcuation of the points in the left border of the partition
-          double *left_ghost_points_;
+          float *left_ghost_points_;
 
           // points taht are used by the stencil calcuation of the points in the right border of the partition
-          double *right_ghost_points_;
+          float *right_ghost_points_;
+
+          float *left_border_inner_halo;
+          float *right_border_inner_halo;
 
           // Streams for the border calculations. each of the 4 streams are for the left, top, right and bottom borders in that order
           GPUStream border_calc_streams[4];
 
           // Streams that will be used do calculate the inner data of the partition. There will be one stream per GPU. This needs to be a vector because the number of GPUs is not known in advance.
-          std::vector<GPUStream> inner_data_streams;
+          GPUStream *inner_data_streams = 0;
 
-          double initial_inner_value_;
-          double initial_left_value_;
-          double initial_right_value_;
-          double initial_top_value_;
-          double initial_bottom_value_;
+          float initial_inner_value_;
+          float initial_left_value_;
+          float initial_right_value_;
+          float initial_top_value_;
+          float initial_bottom_value_;
 
           /**
      * @brief Initializes the MPI context
@@ -130,7 +133,7 @@ namespace pde_solver
        * @param rank 
        */
           void RankByCoordinates(const int coords[2], int *rank);
-          void InitData(double inner_value, double left_border_value, double right_border_value, double bottom_border_value, double top_border_value);
+          void InitData(float inner_value, float left_border_value, float right_border_value, float bottom_border_value, float top_border_value);
           /**
        * @brief Initializes the left border of the partition and left ghost points that are part of the halo. 
        * 
@@ -140,7 +143,7 @@ namespace pde_solver
        * @param bottom_border_value 
        * @param top_border_value 
        */
-          void InitLeftBorderAndGhost(double inner_value, double left_border_value, double bottom_border_value, double top_border_value);
+          void InitLeftBorderAndGhost(float inner_value, float left_border_value, float bottom_border_value, float top_border_value);
 
           /**
  * @brief 
@@ -150,7 +153,7 @@ namespace pde_solver
  * @param bottom_border_value 
  * @param top_border_value 
  */
-          void InitRightBorderAndGhost(double inner_value, double right_border_value, double bottom_border_value, double top_border_value);
+          void InitRightBorderAndGhost(float inner_value, float right_border_value, float bottom_border_value, float top_border_value);
 
           void ConfigGpuExecution();
 
@@ -181,7 +184,7 @@ namespace pde_solver
      * @param argc Number of arguments provided by the user
      * @param argv Arguments provided by the user
      */
-          void Init(double value, int argc, char *argv[]);
+          void Init(float value, int argc, char *argv[]);
 
           /**
      * @brief Initializes the global matrix and a new MPI context. This method assigns custom values to the borders of the matrix
@@ -194,7 +197,7 @@ namespace pde_solver
      * @param argc Number of arguments provided by the user
      * @param argv Arguments provided by the user
      */
-          void Init(double inner_value, double left_border_value, double right_border_value, double bottom_border_value, double top_border_value, int argc, char *argv[]);
+          void Init(float inner_value, float left_border_value, float right_border_value, float bottom_border_value, float top_border_value, int argc, char *argv[]);
 
           /**
      * @brief Sends all the borders of the partition to the corresponding neighbors and gets the halo values from these neighbors
@@ -202,10 +205,10 @@ namespace pde_solver
      */
           void AllNeighbourExchange();
 
-          void SetGlobal(double value, int row, int col);
-          void SetLocal(double value, int row, int col);
+          void SetGlobal(float value, int row, int col);
+          void SetLocal(float value, int row, int col);
 
-          const double GetLocal(int partition_row, int partition_col);
+          const float GetLocal(int partition_row, int partition_col);
 
           const PartitionNeighbour GetNeighbour(PartitionNeighbourType neighbour_type);
 
@@ -219,16 +222,16 @@ namespace pde_solver
           /**
      * @brief Performs a Jacobian sweep of the current partition
      * 
-     * @return double Maximum difference between the new and the old values
+     * @return float Maximum difference between the new and the old values
      */
-          double LocalSweep(Matrix newMatrix, ExecutionStats *execution_stats);
+          float LocalSweep(Matrix newMatrix, ExecutionStats *execution_stats);
 
           /**
      * @brief Gets the global max difference by performing a reduction operation for all processors
      * 
-     * @return double Global max difference
+     * @return float Global max difference
      */
-          const double GlobalDifference(ExecutionStats *execution_stats);
+          const float GlobalDifference(ExecutionStats *execution_stats);
 
           /**
      * @brief Prints information about the current partition.
@@ -261,9 +264,9 @@ namespace pde_solver
           /**
  * @brief Puts together the data in the partition
  * 
- * @return double* 
+ * @return float* 
  */
-          double *AssemblePartition();
+          float *AssemblePartition();
 
           /**
            * @brief Checks if the partition is a partition that contains the top border of the matrix.

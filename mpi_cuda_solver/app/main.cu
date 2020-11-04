@@ -37,7 +37,7 @@ int main(int argc,
   printf("GOT HERE13\n\n\n");
   pde_solver::Matrix new_m = m.CloneShell();
   int num_iter = 0;
-  double global_diff = 10;
+  float global_diff = 10;
   ExecutionStats stats = {0.0, 0.0, 0.0, 0.0, 0.0, 0, 0};
   printf("GOT HERE1\n\n\n");
   // double tot_loop_time = 0;

@@ -73,7 +73,7 @@ namespace pde_solver
         return m;
     }
 
-    void Matrix::InitData(double inner_value, double left_border_value, double right_border_value, double bottom_border_value, double top_border_value)
+    void Matrix::InitData(float inner_value, float left_border_value, float right_border_value, float bottom_border_value, float top_border_value)
     {
         this->initial_inner_value_ = inner_value;
         this->initial_left_value_ = left_border_value;
@@ -82,7 +82,7 @@ namespace pde_solver
         this->initial_top_value_ = top_border_value;
         int inner_data_width = this->partition_width_;       //(this->partition_width_ - 2);
         int inner_data_height = this->partition_height_ + 2; // Two extra rows to hold the top and bottom halo
-                                                             //this->inner_points_ = new double[inner_data_height * inner_data_width]; // Since the left and right borders of the partitions are stored separately, there is no need to store them on teh inner points array.
+                                                             //this->inner_points_ = new float[inner_data_height * inner_data_width]; // Since the left and right borders of the partitions are stored separately, there is no need to store them on teh inner points array.
         this->AllocateMemory();
         this->InitLeftBorderAndGhost(inner_value, left_border_value, bottom_border_value, top_border_value);
         this->InitRightBorderAndGhost(inner_value, right_border_value, bottom_border_value, top_border_value);
@@ -176,7 +176,7 @@ namespace pde_solver
         }
     }
 
-    void Matrix::Init(double value, int argc, char *argv[])
+    void Matrix::Init(float value, int argc, char *argv[])
     {
         this->Init(value, value, value, value, value, argc, argv);
     }
@@ -208,39 +208,136 @@ namespace pde_solver
             }
         }
 
+        this->inner_data_streams = new GPUStream[this->matrix_config_.gpu_number];
         // configure inner data streams
         for (int i = 0; i < this->matrix_config_.gpu_number; i++)
         {
             cudaSetDevice(i);
-            cudaStream_t stream;
-            cudaStreamCreate(&stream);
-            this->inner_data_streams.push_back({i, stream});
+            cudaStreamCreate(&(this->inner_data_streams[i].stream));
+            this->inner_data_streams[i].gpu_id = i;
         }
     }
 
     void Matrix::Deallocate()
     {
-        delete[] left_ghost_points_;
-        delete[] right_ghost_points_;
-        delete[] left_border_;
-        delete[] right_border_;
-        delete[] inner_points_;
+        cudaFreeHost(&left_ghost_points_);
+        cudaFreeHost(&right_ghost_points_);
+        cudaFreeHost(&left_border_);
+        cudaFreeHost(&right_border_);
+        cudaFreeHost(&inner_points_);
+        // delete[] left_ghost_points_;
+        // delete[] right_ghost_points_;
+        // delete[] left_border_;
+        // delete[] right_border_;
+        // delete[] inner_points_;
+
+        // TODO (endizhupani@uni-muenster.de): free device data
+        for (int i = 0; i < 4; i++)
+        {
+            cudaFree(this->border_calc_streams[i].d_data);
+        }
+
+        for (int i = 0; i < this->matrix_config_.gpu_number; i++)
+        {
+            cudaFree(this->inner_data_streams[i].d_data);
+        }
+    }
+
+    int calc_gpu_rows(int total_rows, float gpu_perc)
+    {
+        return ceil(total_rows * gpu_perc);
     }
 
     void Matrix::AllocateMemory()
     {
-        int inner_data_width = this->partition_width_;                          //(this->partition_width_ - 2);
-        int inner_data_height = this->partition_height_ + 2;                    // Two extra rows to hold the top and bottom halo
-        this->inner_points_ = new double[inner_data_height * inner_data_width]; // Since the left and right borders of the partitions are stored separately, there is no need to store them on teh inner points array.
-        this->left_border_ = new double[this->partition_height_];
-        this->left_ghost_points_ = new double[this->partition_height_];
-        this->right_border_ = new double[this->partition_height_];
-        this->right_ghost_points_ = new double[this->partition_height_];
+        int inner_data_width = this->partition_width_;       //(this->partition_width_ - 2);
+        int inner_data_height = this->partition_height_ + 2; // Two extra rows to hold the top and bottom halo
+                                                             // this->inner_points_ = new float[inner_data_height * inner_data_width]; // Since the left and right borders of the partitions are stored separately, there is no need to store them on teh inner points array.
+        cudaMallocHost(&(this->inner_points_), inner_data_height * inner_data_width * sizeof(float));
+        cudaMallocHost(&(this->left_border_), this->partition_height_ * sizeof(float));
+        cudaMallocHost(&(this->left_ghost_points_), this->partition_height_ * sizeof(float));
+        cudaMallocHost(&(this->left_border_inner_halo), this->partition_height_ * sizeof(float));
+        cudaMallocHost(&(this->right_border_), this->partition_height_ * sizeof(float));
+        cudaMallocHost(&(this->right_ghost_points_), this->partition_height_ * sizeof(float));
+        cudaMallocHost(&(this->right_border_inner_halo), this->partition_height_ * sizeof(float));
+
+        // this->left_border_ = new float[this->partition_height_];
+        // this->left_ghost_points_ = new float[this->partition_height_];
+        // this->right_border_ = new float[this->partition_height_];
+        // this->right_ghost_points_ = new float[this->partition_height_];
         this->top_ghost = &this->inner_points_[0];
         this->bottom_ghost = &this->inner_points_[(inner_data_height - 1) * inner_data_width];
+
+        float *inner_points;
+
+        int inner_rows = this->partition_height_ - 2;
+
+        int gpu_rows = calc_gpu_rows(inner_rows, 1 - this->matrix_config_.cpu_perc);
+
+        int rows_per_gpu = floor(((float)gpu_rows) / this->matrix_config_.gpu_number);
+        int rows_allocated = 0;
+        cudaError err;
+        for (int i = 0; i < this->matrix_config_.gpu_number - 1; i++)
+        {
+            cudaSetDevice(this->inner_data_streams[i].gpu_id);
+            err = cudaMalloc(&(this->inner_data_streams[i].d_data), (rows_per_gpu + 2) * this->partition_width_ * sizeof(float));
+            if (err != cudaSuccess)
+            {
+                this->Finalize();
+                printf("Could not allocate memory on the GPU for one of the borders.");
+                throw new std::logic_error("Memory allocation failed");
+            }
+            rows_allocated += rows_per_gpu;
+        }
+
+        cudaSetDevice(this->inner_data_streams[this->matrix_config_.gpu_number - 1].gpu_id);
+        err = cudaMalloc(&(this->inner_data_streams[this->matrix_config_.gpu_number - 1].d_data), ((gpu_rows - rows_allocated) + 2) * this->partition_width_ * sizeof(float));
+        if (err != cudaSuccess)
+        {
+            this->Finalize();
+            printf("Could not allocate memory on the GPU for one of the borders.");
+            throw new std::logic_error("Memory allocation failed");
+        }
+
+        for (int i = 0; i < 4; i++)
+        {
+            cudaSetDevice(border_calc_streams[i].gpu_id);
+            if ((i == 0 && !this->IsLeftBorder()) ||
+                (i == 2 && !this->IsRightBorder()))
+            {
+                // remove 2 from partition height because the first and last element of the borders are always calculated by the CPU.
+                int gpu_elements = calc_gpu_rows(this->partition_height_ - 2, this->matrix_config_.cpu_perc);
+                gpu_elements += 2; // add two for the top and bottom halo cells.
+                gpu_elements *= 3; // multiply by 3 because three columns will need to be stored. the right and left halo of each border needs to be stored.
+
+                err = cudaMalloc(&(border_calc_streams[i].d_data), gpu_elements * sizeof(float));
+                if (err != cudaSuccess)
+                {
+                    this->Finalize();
+                    printf("Could not allocate memory on the GPU for one of the borders.");
+                    throw new std::logic_error("Memory allocation failed");
+                }
+            }
+            if (
+                (i == 1 && !this->IsTopBorder()) ||
+                (i == 3 && !this->IsBottomBorder()))
+            {
+                // the top and bottom border are two elements smaller then the partition width. Additionally, the first and last element are calculated by the CPU.
+                int gpu_elements = calc_gpu_rows(this->partition_width_ - 4, 1 - this->matrix_config_.cpu_perc);
+                gpu_elements += 2; // add two for the top and bottom halo cells.
+                gpu_elements *= 3; // multiply by 3 because three columns will need to be stored. the right and left halo of each border needs to be stored.
+                err = cudaMalloc(&(border_calc_streams[i].d_data), gpu_elements * sizeof(float));
+                if (err != cudaSuccess)
+                {
+                    this->Finalize();
+                    printf("Could not allocate memory on the GPU for one of the borders.");
+                    throw new std::logic_error("Memory allocation failed");
+                }
+            }
+        }
     }
 
-    void Matrix::Init(double inner_value, double left_border_value, double right_border_value, double bottom_border_value, double top_border_value, int argc, char *argv[])
+    void Matrix::Init(float inner_value, float left_border_value, float right_border_value, float bottom_border_value, float top_border_value, int argc, char *argv[])
     {
         if (!is_initialized_)
         {
@@ -262,12 +359,12 @@ namespace pde_solver
 
         // This is the partition height without the ghost points.
         this->partition_height_ = this->matrix_height_ / this->processes_per_dimension_[0];
-        this->InitData(inner_value, left_border_value, right_border_value, bottom_border_value, top_border_value);
         this->ConfigGpuExecution();
+        this->InitData(inner_value, left_border_value, right_border_value, bottom_border_value, top_border_value);
         MPI_Barrier(this->GetCartesianCommunicator());
     }
 
-    void Matrix::InitLeftBorderAndGhost(double inner_value, double left_border_value, double bottom_border_value, double top_border_value)
+    void Matrix::InitLeftBorderAndGhost(float inner_value, float left_border_value, float bottom_border_value, float top_border_value)
     {
 
         // assing the left border values. If the partition is on the border of the cartesian grid,
@@ -277,7 +374,8 @@ namespace pde_solver
         {
             for (int i = 0; i < this->partition_height_; i++)
             {
-                left_border_[i] = left_border_value;
+                SetLocal(left_border_value, i, 0);
+                //left_border_[i] = left_border_value;
             }
 
             return;
@@ -286,26 +384,31 @@ namespace pde_solver
         int start = 0;
         if (this->IsTopBorder())
         {
-            this->left_border_[start] = top_border_value;
+            SetLocal(top_border_value, start, 0);
+            //
+            //this->left_border_[start] = top_border_value;
             this->left_ghost_points_[start] = top_border_value;
+            this->left_border_inner_halo[start] = top_border_value;
             start++;
         }
 
         int end = this->partition_height_ - 1;
         if (this->IsBottomBorder())
         {
-            this->left_border_[end] = bottom_border_value;
+            SetLocal(bottom_border_value, end, 0);
             this->left_ghost_points_[end] = bottom_border_value;
+            this->left_border_inner_halo[end] = bottom_border_value;
             end--;
         }
         for (int i = start; i <= end; i++)
         {
-            this->left_border_[i] = inner_value;
+            SetLocal(inner_value, i, 0);
             this->left_ghost_points_[i] = inner_value;
+            this->left_border_inner_halo[start] = inner_value;
         }
     }
 
-    void Matrix::InitRightBorderAndGhost(double inner_value, double right_border_value, double bottom_border_value, double top_border_value)
+    void Matrix::InitRightBorderAndGhost(float inner_value, float right_border_value, float bottom_border_value, float top_border_value)
     {
 
         //assign the right border values of the global matrix
@@ -321,21 +424,23 @@ namespace pde_solver
         int start = 0;
         if (this->IsTopBorder())
         {
-            this->right_border_[start] = top_border_value;
-            this->right_ghost_points_[start] = top_border_value;
+            SetLocal(top_border_value, start, 0);
+            this->right_border_inner_halo[start] = top_border_value;
             start++;
         }
 
         int end = this->partition_height_ - 1;
         if (this->IsBottomBorder())
         {
-            this->right_border_[end] = bottom_border_value;
+            SetLocal(bottom_border_value, end, 0);
             this->right_ghost_points_[end] = bottom_border_value;
+            this->right_border_inner_halo[end] = bottom_border_value;
             end--;
         }
         for (int i = start; i <= end; i++)
         {
-            this->right_border_[i] = inner_value;
+            SetLocal(inner_value, i, 0);
+            this->right_border_inner_halo[i] = inner_value;
             this->right_ghost_points_[i] = inner_value;
         }
     }
@@ -418,10 +523,10 @@ namespace pde_solver
         }
     }
 
-    double Matrix::LocalSweep(Matrix new_matrix, ExecutionStats *execution_stats)
+    float Matrix::LocalSweep(Matrix new_matrix, ExecutionStats *execution_stats)
     {
         this->current_max_difference_ = 0;
-        double diff, new_value;
+        float diff, new_value;
 
         int max_thread_num = omp_get_max_threads();
 
@@ -451,11 +556,12 @@ namespace pde_solver
                         new_matrix.SetLocal(new_value, 0, 0);
                     }
 
-                    int gpu_start = (int)ceil((double)this->partition_height_ * this->matrix_config_.cpu_perc) + 1;
+                    int gpu_start = (int)ceil((float)this->partition_height_ * this->matrix_config_.cpu_perc) + 1;
                     int gpu_end = this->partition_height_ - 2; // last index of the elements to be processed by the GPU.
                     //cudaStream_t streams[this->matrix_config_.gpu_number];
                     if (gpu_start <= gpu_end)
                     {
+                        // TODO (endizhupani@uni-muenster.de): Start the GPU Computation
                     }
 
 #pragma omp parallel for reduction(max \
@@ -651,7 +757,7 @@ namespace pde_solver
         }
     }
 
-    const double Matrix::GetLocal(int partition_row, int partition_col)
+    const float Matrix::GetLocal(int partition_row, int partition_col)
     {
         if (partition_col < 0 || partition_col > this->partition_width_ - 1 || partition_row < 0 || partition_row > this->partition_height_ - 1)
         {
@@ -672,28 +778,38 @@ namespace pde_solver
         return this->inner_points_[row_offset + partition_col];
     }
 
-    void Matrix::SetLocal(double value, int row, int col)
+    void Matrix::SetLocal(float value, int row, int col)
     {
         if (col == 0)
         {
             this->left_border_[row] = value;
-            // If it's the left border on the first or last row of the partition, copy it to the inner points as well because it will be easier to transfer it to the bottom and top ghost points of the top and bottom neightbours.
-            if (row == 0 || row == this->partition_height_ - 1)
-            {
-                this->inner_points_[(row + 1) * this->partition_width_] = value;
-            }
+            //// If it's the left border on the first or last row of the partition, copy it to the inner points as well because it will be easier to transfer it to the bottom and top ghost points of the top and bottom neightbours.
+            // if (row == 0 || row == this->partition_height_ - 1)
+            // {
+            this->inner_points_[(row + 1) * this->partition_width_] = value; // Copy it to the inner data becuase it makes it mutch simpler to be processed by the GPU
+            //}
 
             return;
+        }
+
+        if (col == 1)
+        {
+            this->left_border_inner_halo[row] = value;
+        }
+
+        if (col == this->partition_width_ - 2)
+        {
+            this->left_border_inner_halo[row] = value;
         }
 
         if (col == this->partition_width_ - 1)
         {
             this->right_border_[row] = value;
-            // If it's the left border on the first or last row of the partition, copy it to the inner points as well because it will be easier to transfer it to the bottom and top ghost points of the top and bottom neightbours.
-            if (row == 0 || row == this->partition_height_ - 1)
-            {
-                this->inner_points_[(row + 1) * this->partition_width_ + col] = value;
-            }
+            // // If it's the left border on the first or last row of the partition, copy it to the inner points as well because it will be easier to transfer it to the bottom and top ghost points of the top and bottom neightbours.
+            // if (row == 0 || row == this->partition_height_ - 1)
+            // {
+            this->inner_points_[(row + 1) * this->partition_width_ + col] = value;
+            // }
 
             return;
         }
@@ -701,7 +817,7 @@ namespace pde_solver
         this->inner_points_[(row + 1) * this->partition_width_ + col] = value;
     }
 
-    void Matrix::SetGlobal(double value, int row, int col)
+    void Matrix::SetGlobal(float value, int row, int col)
     {
         if (row < 0 || col < 0)
         {
@@ -737,11 +853,11 @@ namespace pde_solver
         this->SetLocal(value, local_row, local_col);
     }
 
-    const double Matrix::GlobalDifference(ExecutionStats *execution_stats)
+    const float Matrix::GlobalDifference(ExecutionStats *execution_stats)
     {
         MPI_Barrier(this->GetCartesianCommunicator());
         auto reduction_start = MPI_Wtime();
-        double received_difference = 0;
+        float received_difference = 0;
         MPI_Allreduce(&current_max_difference_, &received_difference, 1, MPI_DOUBLE, MPI_MAX, this->GetCartesianCommunicator());
         current_max_difference_ = received_difference;
         execution_stats->total_time_reducing_difference += (MPI_Wtime() - reduction_start);
@@ -751,12 +867,12 @@ namespace pde_solver
 
     void Matrix::ShowMatrix()
     {
-        double *partition_data = this->AssemblePartition();
-        double *buffer, *matrix;
+        float *partition_data = this->AssemblePartition();
+        float *buffer, *matrix;
         if (this->proc_id_ == 0)
         {
-            buffer = new double[this->matrix_height_ * this->matrix_width_];
-            matrix = new double[this->matrix_height_ * this->matrix_width_];
+            buffer = new float[this->matrix_height_ * this->matrix_width_];
+            matrix = new float[this->matrix_height_ * this->matrix_width_];
         }
 
         MPI_Gather(partition_data, this->partition_height_ * this->partition_width_, MPI_DOUBLE, buffer, this->partition_height_ * this->partition_width_, MPI_DOUBLE, 0, this->GetCartesianCommunicator());
@@ -793,9 +909,9 @@ namespace pde_solver
         delete[] matrix;
     }
 
-    double *Matrix::AssemblePartition()
+    float *Matrix::AssemblePartition()
     {
-        double *partition_data = new double[this->partition_width_ * this->partition_height_];
+        float *partition_data = new float[this->partition_width_ * this->partition_height_];
         for (int row = 0; row < this->partition_height_; row++)
         {
             partition_data[row * this->partition_width_] = this->left_border_[row];
@@ -822,7 +938,7 @@ namespace pde_solver
     void Matrix::PrintPartitionData()
     {
         std::cout << "Processor id: " << this->proc_id_ << "; Coordinates: (" << this->partition_coords_[0] << ", " << this->partition_coords_[1] << "); Top ID: " << this->neighbours[0].GetNeighborId() << "; Right ID: " << this->neighbours[1].GetNeighborId() << "; Bottom ID: " << this->neighbours[2].GetNeighborId() << "; Left ID: " << this->neighbours[3].GetNeighborId() << "; Partition size: " << this->partition_width_ << "x" << this->partition_height_ << std::endl;
-        double *partition_data = this->AssemblePartition();
+        float *partition_data = this->AssemblePartition();
         printf("       ");
         if (this->IsTopBorder())
         {

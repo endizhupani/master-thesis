@@ -23,34 +23,10 @@
 #include <string>
 #include <iostream>
 #include "cuda.h"
+#include "cuda_runtime.h"
 #ifndef COMMON_H
 #define COMMON_H
 
-#ifdef __CUDACC__
-/**
- * \brief Macro for function type qualifiers __host__ __device__.
- *
- * Macro for function type qualifiers __host__ __device__. This macro is only
- * define when compiled with the Nvidia C compiler nvcc because ordinary C/C++
- * compiler will complain about function type qualifiers.
- */
-#define MSL_USERFUNC __host__ __device__
-/**
- * \brief Macro for function type qualifier __device__.
- *
- * Macro for function type qualifier __device__. This macro is only
- * define when compiled with the Nvidia C compiler nvcc because ordinary C/C++
- * compiler will complain about function type qualifiers.
- */
-#define MSL_GPUFUNC __device__
-/**
- * \brief Macro for function type qualifier __host__.
- *
- * Macro for function type qualifier __host__. This macro is only
- * define when compiled with the Nvidia C compiler nvcc because ordinary C/C++
- * compiler will complain about function type qualifiers.
- */
-#define MSL_CPUFUNC __host__
 /**
  * \brief This macro checks return value of the CUDA runtime call and exits
  *        the application if the call failed.
@@ -65,7 +41,6 @@
             exit(EXIT_FAILURE);                                           \
         }                                                                 \
     }
-#endif
 
 /**
  * @brief The type of the partition neighbour
@@ -108,7 +83,7 @@ public:
     int gpu_number;
     int n_rows;
     int n_cols;
-    double cpu_perc;
+    float cpu_perc;
 };
 
 struct GPUStream
@@ -119,6 +94,8 @@ public:
 
     // The stream created on the gpu
     cudaStream_t stream;
+
+    float *d_data;
 };
 
 struct ExecutionStats
