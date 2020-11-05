@@ -102,10 +102,12 @@ namespace pde_solver
 
                 // the value on the first column of the halo will come from the left border
                 this->inner_points_[0] = left_border_value;
+                // No need to assign the part that will go to the GPU because the calculation will not be done.
             }
             else
             {
                 this->inner_points_[0] = inner_value;
+                this->left_region[this->partition_height_ + 2] = inner_value; // first row, second column.
             }
 
             if (this->IsRightBorder())
@@ -116,6 +118,7 @@ namespace pde_solver
             else
             {
                 this->inner_points_[inner_data_width - 1] = inner_value;
+                this->right_region[this->partition_height_ + 2] = inner_value; // first row, second column.
             }
 
             for (col = 1; col < inner_data_width - 1; col++)
@@ -136,6 +139,7 @@ namespace pde_solver
             else
             {
                 this->inner_points_[row * inner_data_width] = inner_value;
+                this->left_region[this->partition_height_ + 2 + this->partition_height_ + 1] = inner_value; // last row, second column.
             }
 
             if (this->IsRightBorder())
@@ -146,6 +150,7 @@ namespace pde_solver
             else
             {
                 this->inner_points_[inner_data_width * inner_data_height - 1] = inner_value;
+                this->right_region[this->partition_height_ + 2 + this->partition_height_ + 1] = inner_value; // last row, second column.
             }
 
             for (col = 1; col < inner_data_width - 1; col++)
@@ -173,7 +178,9 @@ namespace pde_solver
                 }
             }
         }
-    }
+
+        // Move data to GPU
+        }
 
     void Matrix::Init(float value, int argc, char *argv[])
     {
