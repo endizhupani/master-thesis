@@ -48,8 +48,6 @@
  */
 enum PartitionNeighbourType
 {
-    LEFT_NEIGHTBOUR,
-    RIGHT_NEIGHBOUR,
     BOTTOM_NEIGHBOUR,
     TOP_NEIGHBOUR
 };

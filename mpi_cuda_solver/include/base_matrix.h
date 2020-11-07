@@ -42,10 +42,10 @@ namespace pde_solver
         // global matrix height
         int matrix_height_;
         // array that holds the left border of the partition
-        float *left_border_;
+        // float *left_border_;
 
-        // array that holds the right border of the partition
-        float *right_border_;
+        // // array that holds the right border of the partition
+        // float *right_border_;
 
         // array holding the inner points of the matrix as well as the top and bottom border
         float *inner_points_;

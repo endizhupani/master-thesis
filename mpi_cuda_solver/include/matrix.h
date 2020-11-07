@@ -47,10 +47,10 @@ namespace pde_solver
           // number of rows or columns that will serve as the halo of the partition
           int halo_size_;
 
-          // width of the current partition
-          int partition_width_;
+          // // width of the current partition
+          // int partition_width_;
 
-          // height of the current partition
+          // height of the current partition. It does not include the top and bottom halo
           int partition_height_;
 
           // number of the process that is working with the current partition
@@ -62,10 +62,10 @@ namespace pde_solver
           // Number of partitions along the y-dimension
           int y_partitions_;
 
-          // Number of partitions along the x-dimension
-          int x_partitions_;
+          // // Number of partitions along the x-dimension
+          // int x_partitions_;
 
-          // Neighbours on the top, right, bottom and left of the partition
+          // Neighbours on the top and bottom of the partition
           std::array<PartitionNeighbour, 4> neighbours;
 
           // Coordnates of the partition in the cartesian topology
@@ -97,23 +97,23 @@ namespace pde_solver
           // Pointer to the first row of the inner_data. Technically inner_data can be used with the same result but this was supplied for completeness.
           float *top_ghost;
 
-          // points that are used by the stencil calcuation of the points in the left border of the partition
-          float *left_ghost_points_;
+          // // points that are used by the stencil calcuation of the points in the left border of the partition
+          // float *left_ghost_points_;
 
-          // points taht are used by the stencil calcuation of the points in the right border of the partition
-          float *right_ghost_points_;
+          // // points taht are used by the stencil calcuation of the points in the right border of the partition
+          // float *right_ghost_points_;
 
-          float *left_border_inner_halo;
-          float *right_border_inner_halo;
+          // float *left_border_inner_halo;
+          // float *right_border_inner_halo;
 
-          // three columns on the left side of the matrix. They hold the left border, the left ghost points and the inner halo for the left border. The are 2 elements taller to hold the top and bottom halo for the border region
-          float *left_region;
+          // // three columns on the left side of the matrix. They hold the left border, the left ghost points and the inner halo for the left border. The are 2 elements taller to hold the top and bottom halo for the border region
+          // float *left_region;
 
-          // three columns on the right side of the matrix. They hold the right border, the right ghost points and the inner halo for the right border
-          float *right_region;
+          // // three columns on the right side of the matrix. They hold the right border, the right ghost points and the inner halo for the right border
+          // float *right_region;
 
-          // Streams for the border calculations. each of the 4 streams are for the left, top, right and bottom borders in that order
-          GPUStream border_calc_streams[4];
+          // Streams for the border calculations. 2 streams for the top and bottom border.
+          GPUStream border_calc_streams[2];
 
           // Streams that will be used do calculate the inner data of the partition. There will be one stream per GPU. This needs to be a vector because the number of GPUs is not known in advance.
           GPUStream *inner_data_streams = 0;
@@ -289,22 +289,6 @@ namespace pde_solver
            * @return false if the partition does not contain the bottom border of the matrix.
            */
           bool IsBottomBorder();
-
-          /**
-           * @brief Checks if the partition is a partition that contains the left border of the matrix.
-           * 
-           * @return true if the partition contains the left border of the matrix.
-           * @return false if the partition does not contain the left border of the matrix.
-           */
-          bool IsLeftBorder();
-
-          /**
-           * @brief Checks if the partition is a partition that contains the right border of the matrix.
-           * 
-           * @return true if the partition contains the right border of the matrix.
-           * @return false if the partition does not contain the right border of the matrix.
-           */
-          bool IsRightBorder();
 
           void Finalize();
 
