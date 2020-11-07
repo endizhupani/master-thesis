@@ -102,7 +102,7 @@ public:
     cudaStream_t stream;
 
     float *d_data;
-
+    float *h_data;
     float *halo_points;
 
     int halo_points_host_start;

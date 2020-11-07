@@ -187,7 +187,8 @@ namespace pde_solver
             float *start_right_border = &(this->right_border_[this->inner_data_streams[i].halo_points_host_start]);
             cudaSetDevice(this->inner_data_streams[i].gpu_id);
             cudaMemcpyAsync(this->inner_data_streams[i].d_data, start, (this->inner_data_streams[i].gpu_data_width) * (this->inner_data_streams[i].gpu_data_height + 2) * sizeof(float), cudaMemcpyHostToDevice, this->inner_data_streams[i].stream);
-            cudaMemcpyAsync(this->inner_data_streams[i].halo_points, start_left_border, (2) * (this->inner_data_streams[i].gpu_data_height), cudaMemcpyHostToDevice, this->inner_data_streams[i].stream);
+            cudaMemcpyAsync(this->inner_data_streams[i].halo_points, start_left_border, sizeof(float) * (this->inner_data_streams[i].gpu_data_height), cudaMemcpyHostToDevice, this->inner_data_streams[i].stream);
+            cudaMemcpyAsync((this->inner_data_streams[i].halo_points + ), start_right_border, sizeof(float) * (this->inner_data_streams[i].gpu_data_height), cudaMemcpyHostToDevice, this->inner_data_streams[i].stream);
         }
 
         // for (int i = 0; i < 4; i++)
