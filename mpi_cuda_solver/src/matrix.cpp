@@ -180,7 +180,41 @@ namespace pde_solver
         }
 
         // Move data to GPU
+        for (int i = 0; i < this->matrix_config_.gpu_number; i++)
+        {
+            float *start = &(this->inner_points_[this->inner_data_streams[i].gpu_region_start * (this->inner_data_streams[i].gpu_data_width + 2)]);
+            float *start_left_border = &(this->left_border_[this->inner_data_streams[i].halo_points_host_start]);
+            float *start_right_border = &(this->right_border_[this->inner_data_streams[i].halo_points_host_start]);
+            cudaSetDevice(this->inner_data_streams[i].gpu_id);
+            cudaMemcpyAsync(this->inner_data_streams[i].d_data, start, (this->inner_data_streams[i].gpu_data_width) * (this->inner_data_streams[i].gpu_data_height + 2) * sizeof(float), cudaMemcpyHostToDevice, this->inner_data_streams[i].stream);
+            cudaMemcpyAsync(this->inner_data_streams[i].halo_points, start_left_border, (2) * (this->inner_data_streams[i].gpu_data_height), cudaMemcpyHostToDevice, this->inner_data_streams[i].stream);
         }
+
+        // for (int i = 0; i < 4; i++)
+        // {
+        //     if ((i == 0 && !this->IsLeftBorder()) ||
+        //         (i == 2 && !this->IsTopBorder()) ||
+        //         (i == 2 && !this->IsRightBorder()) ||
+        //         (i == 2 && !this->IsBottomBorder()))
+        //     {
+        //         switch (i)
+        //         {
+        //         case 0:
+
+        //             /* code */
+        //             break;
+        //         case 1:
+        //             break;
+        //         case 2:
+        //             break;
+        //         case 3:
+        //             break;
+        //         default:
+        //             break;
+        //         }
+        //     }
+        // }
+    }
 
     void Matrix::Init(float value, int argc, char *argv[])
     {
@@ -275,36 +309,37 @@ namespace pde_solver
 
         int rows_per_gpu = floor(((float)gpu_rows) / this->matrix_config_.gpu_number);
         int rows_allocated = 0;
-        cudaError err;
+        int inner_data_gpu_width = this->partition_width_ - 2; // the two borders will be on a separate container
+        //cudaError err;
         for (int i = 0; i < this->matrix_config_.gpu_number - 1; i++)
         {
             cudaSetDevice(this->inner_data_streams[i].gpu_id);
-            err = cudaMalloc(&(this->inner_data_streams[i].d_data), (rows_per_gpu + 2) * this->partition_width_ * sizeof(float));
-            if (err != cudaSuccess)
-            {
-                this->Finalize();
-                printf("Could not allocate memory on the GPU for one of the borders.");
-                throw new std::logic_error("Memory allocation failed");
-            }
+            CUDA_CHECK_RETURN(cudaMalloc(&(this->inner_data_streams[i].d_data), (rows_per_gpu + 2) * (inner_data_width) * sizeof(float)));
             rows_allocated += rows_per_gpu;
-            this->inner_data_streams[i].gpu_start_row_ = inner_rows - rows_allocated;
+            CUDA_CHECK_RETURN(cudaMalloc(&(this->inner_data_streams[i].halo_points), (rows_per_gpu * 2) * sizeof(float)));
+
+            this->inner_data_streams[i].gpu_region_start = (inner_rows - rows_allocated) + 2;                      // add 2 to offset the top halo and the top border that are stored on the inner_data variable
+            this->inner_data_streams[i].halo_points_host_start = this->inner_data_streams[i].gpu_region_start - 1; // the left border and right border have 2 rows less than the inner data.
+            this->inner_data_streams[i].gpu_data_width = this->partition_width_;
+            this->inner_data_streams[i].gpu_data_height = rows_per_gpu;
+            this->inner_data_streams[i].is_contiguous_on_host = true;
         }
 
         cudaSetDevice(this->inner_data_streams[this->matrix_config_.gpu_number - 1].gpu_id);
         int remaining_gpu_rows = (gpu_rows - rows_allocated);
         rows_allocated += remaining_gpu_rows;
-        this->inner_data_streams[this->matrix_config_.gpu_number - 1].gpu_start_row_ = inner_rows - rows_allocated;
-        err = cudaMalloc(&(this->inner_data_streams[this->matrix_config_.gpu_number - 1].d_data), (remaining_gpu_rows + 2) * this->partition_width_ * sizeof(float));
-        if (err != cudaSuccess)
-        {
-            this->Finalize();
-            printf("Could not allocate memory on the GPU for one of the borders.");
-            throw new std::logic_error("Memory allocation failed");
-        }
+
+        CUDA_CHECK_RETURN(cudaMalloc(&(this->inner_data_streams[this->matrix_config_.gpu_number - 1].d_data), (remaining_gpu_rows + 2) * (inner_data_width) * sizeof(float)));
+        CUDA_CHECK_RETURN(cudaMalloc(&(this->inner_data_streams[this->matrix_config_.gpu_number - 1].halo_points), (remaining_gpu_rows * 2) * sizeof(float)));
+        this->inner_data_streams[this->matrix_config_.gpu_number - 1].gpu_region_start = (inner_rows - rows_allocated) + 2;                                                        // add 2 to offset the top halo and the top border that are stored on the inner_data variable
+        this->inner_data_streams[this->matrix_config_.gpu_number - 1].halo_points_host_start = this->inner_data_streams[this->matrix_config_.gpu_number - 1].gpu_region_start - 1; // the side broders have two columns less than the
+        this->inner_data_streams[this->matrix_config_.gpu_number - 1].gpu_data_width = this->partition_width_;
+        this->inner_data_streams[this->matrix_config_.gpu_number - 1].gpu_data_height = remaining_gpu_rows;
+        this->inner_data_streams[this->matrix_config_.gpu_number - 1].is_contiguous_on_host = true;
 
         for (int i = 0; i < 4; i++)
         {
-            cudaSetDevice(border_calc_streams[i].gpu_id);
+            CUDA_CHECK_RETURN(cudaSetDevice(border_calc_streams[i].gpu_id));
             if ((i == 0 && !this->IsLeftBorder()) ||
                 (i == 2 && !this->IsRightBorder()))
             {
@@ -312,14 +347,8 @@ namespace pde_solver
                 int gpu_elements = calc_gpu_rows(this->partition_height_ - 2, this->matrix_config_.cpu_perc);
                 gpu_elements += 2; // add two for the top and bottom halo cells.
                 gpu_elements *= 3; // multiply by 3 because three columns will need to be stored. the right and left halo of each border needs to be stored.
-
-                err = cudaMalloc(&(border_calc_streams[i].d_data), gpu_elements * sizeof(float));
-                if (err != cudaSuccess)
-                {
-                    this->Finalize();
-                    printf("Could not allocate memory on the GPU for one of the borders.");
-                    throw new std::logic_error("Memory allocation failed");
-                }
+                CUDA_CHECK_RETURN(cudaMalloc(&(border_calc_streams[i].d_data), gpu_elements * sizeof(float)));
+                this->border_calc_streams[i].gpu_region_start = (this->partition_height_ - 2) - gpu_elements + 1; // Add one to offset the first element of the border which will be calculated by the CPU
             }
             if (
                 (i == 1 && !this->IsTopBorder()) ||
@@ -329,13 +358,8 @@ namespace pde_solver
                 int gpu_elements = calc_gpu_rows(this->partition_width_ - 4, 1 - this->matrix_config_.cpu_perc);
                 gpu_elements += 2; // add two for the top and bottom halo cells.
                 gpu_elements *= 3; // multiply by 3 because three columns will need to be stored. the right and left halo of each border needs to be stored.
-                err = cudaMalloc(&(border_calc_streams[i].d_data), gpu_elements * sizeof(float));
-                if (err != cudaSuccess)
-                {
-                    this->Finalize();
-                    printf("Could not allocate memory on the GPU for one of the borders.");
-                    throw new std::logic_error("Memory allocation failed");
-                }
+                CUDA_CHECK_RETURN(cudaMalloc(&(border_calc_streams[i].d_data), gpu_elements * sizeof(float)));
+                this->border_calc_streams[i].gpu_region_start = (this->partition_width_ - 4) - gpu_elements + 2; // Add two to offset the first element of the row which belongs to the left border and the first element of the border whcih is calculated by the CPU.
             }
         }
     }
@@ -520,6 +544,18 @@ namespace pde_solver
 
     float Matrix::LocalSweep(Matrix new_matrix, ExecutionStats *execution_stats)
     {
+        for (int i = 0; i < this->matrix_config_.gpu_number; i++)
+        {
+            cudaSetDevice(this->inner_data_streams[i].gpu_id);
+            cudaStreamSynchronize(this->inner_data_streams[i].stream);
+        }
+
+        for (int i = 0; i < 4; i++)
+        {
+            cudaSetDevice(this->border_calc_streams[i].gpu_id);
+            cudaStreamSynchronize(this->border_calc_streams[i].stream);
+        }
+
         this->current_max_difference_ = 0;
         float diff, new_value;
 
@@ -561,7 +597,7 @@ namespace pde_solver
 
 #pragma omp parallel for reduction(max \
                                    : current_max_difference_)
-                    for (int i = 1; i < gpu_start; i++)
+                    for (int i = 1; i < this->partition_height_ - 1; i++)
                     {
                         new_value = (this->GetLocal(i - 1, 0) + this->GetLocal(i + 1, 0) + this->left_ghost_points_[i] + this->GetLocal(i, 1)) / 4;
                         diff = fabs(new_value - this->GetLocal(i, 0));
@@ -706,6 +742,9 @@ namespace pde_solver
         execution_stats->total_border_calc_time += (MPI_Wtime() - border_start);
 
         auto inner_points_time = MPI_Wtime();
+
+        // TODO (endizhupani@uni-muenster.de): Start the inner points calculation on the GPU.
+
 #pragma omp parallel reduction(max \
                                : current_max_difference_)
         {
