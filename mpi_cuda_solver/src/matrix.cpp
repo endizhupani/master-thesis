@@ -67,6 +67,7 @@ namespace pde_solver
         m.bottom_grid_border_coord_ = this->bottom_grid_border_coord_;
         m.top_grid_border_coord_ = this->top_grid_border_coord_;
         m.cartesian_communicator_ = this->cartesian_communicator_;
+        m.ConfigGpuExecution();
         m.InitData(this->initial_inner_value_, this->initial_left_value_, this->initial_right_value_, this->initial_bottom_value_, this->initial_top_value_);
         return m;
     }
@@ -140,10 +141,10 @@ namespace pde_solver
         // Move data to GPU
         for (int i = 0; i < this->matrix_config_.gpu_number; i++)
         {
-            float *start = &(this->inner_points_[this->inner_data_streams[i].gpu_region_start * (this->inner_data_streams[i].gpu_data_width + 2)]);
+            this->inner_data_streams[i].h_data = &(this->inner_points_[(this->inner_data_streams[i].gpu_region_start - 1) * (this->inner_data_streams[i].gpu_data_width + 2)]);
             cudaSetDevice(this->inner_data_streams[i].gpu_id);
             cudaMemcpyAsync(this->inner_data_streams[i].d_data,
-                            start,
+                            this->inner_data_streams[i].h_data,
                             (this->inner_data_streams[i].gpu_data_width + 2) * (this->inner_data_streams[i].gpu_data_height + 2) * sizeof(float),
                             cudaMemcpyHostToDevice,
                             this->inner_data_streams[i].stream);
@@ -421,18 +422,86 @@ namespace pde_solver
         }
     }
 
+    const GPUStream Matrix::GetCpuAdjacentInnerStream()
+    {
+        return this->GetStreamForGpuId(0);
+    }
+
+    const GPUStream Matrix::GetStreamForGpuId(int gpu_id)
+    {
+        for (size_t i = 0; i < this->matrix_config_.gpu_number; i++)
+        {
+            if (this->inner_data_streams[i].gpu_id == gpu_id)
+            {
+                return this->inner_data_streams[i];
+            }
+        }
+    }
+
+    const GPUStream Matrix::GetRightBorderStream()
+    {
+        return this->border_calc_streams[1];
+    }
+
+    const GPUStream Matrix::GetLeftBorderStream()
+    {
+        return this->border_calc_streams[0];
+    }
+
     float Matrix::LocalSweep(Matrix new_matrix, ExecutionStats *execution_stats)
     {
         for (int i = 0; i < this->matrix_config_.gpu_number; i++)
         {
-            cudaSetDevice(this->inner_data_streams[i].gpu_id);
-            cudaStreamSynchronize(this->inner_data_streams[i].stream);
+            auto stream = this->GetStreamForGpuId(i);
+            cudaSetDevice(stream.gpu_id);
+
+            // move top border to the host data
+            cudaMemcpyAsync(stream.h_data + stream.gpu_data_width + 2,
+                            stream.d_data + stream.gpu_data_width + 2,
+                            (stream.gpu_data_width + 2) + 2,
+                            cudaMemcpyDeviceToHost,
+                            stream.stream);
+
+            // move bottom border to the host data
+            cudaMemcpyAsync(stream.h_data + ((stream.gpu_data_width + 2) * stream.gpu_data_height),
+                            stream.d_data + ((stream.gpu_data_width + 2) * stream.gpu_data_height),
+                            (stream.gpu_data_width + 2) + 2,
+                            cudaMemcpyDeviceToHost,
+                            stream.stream);
         }
 
-        for (int i = 0; i < 2; i++)
+        for (int i = 0; i < this->matrix_config_.gpu_number; i++)
         {
-            cudaSetDevice(this->border_calc_streams[i].gpu_id);
-            cudaStreamSynchronize(this->border_calc_streams[i].stream);
+            auto stream = this->GetStreamForGpuId(i);
+            cudaSetDevice(stream.gpu_id);
+            cudaStreamSynchronize(stream.stream);
+        }
+
+        for (int i = 0; i < this->matrix_config_.gpu_number; i++)
+        {
+            auto stream = this->GetStreamForGpuId(i);
+            cudaSetDevice(stream.gpu_id);
+
+            // move top halo to the gpu data
+            cudaMemcpyAsync(stream.d_data,
+                            stream.h_data,
+                            (stream.gpu_data_width + 2) + 2,
+                            cudaMemcpyHostToDevice,
+                            stream.stream);
+
+            // move bottom halo to the gpu data
+            cudaMemcpyAsync(stream.d_data + (stream.gpu_data_width + 2) * (stream.gpu_data_height + 1),
+                            stream.h_data + (stream.gpu_data_width + 2) * (stream.gpu_data_height + 1),
+                            (stream.gpu_data_width + 2) + 2,
+                            cudaMemcpyHostToDevice,
+                            stream.stream);
+        }
+
+        for (int i = 0; i < this->matrix_config_.gpu_number; i++)
+        {
+            auto stream = this->GetStreamForGpuId(i);
+            cudaSetDevice(stream.gpu_id);
+            cudaStreamSynchronize(stream.stream);
         }
 
         this->current_max_difference_ = 0;
@@ -562,15 +631,19 @@ namespace pde_solver
         execution_stats->total_border_calc_time += (MPI_Wtime() - border_start);
 
         auto inner_points_time = MPI_Wtime();
+        for (int i = 0; i < this->matrix_config_.gpu_number; i++)
+        {
+            dim3 block_size();
+            cudaSetDevice(i);
+        }
 
-        // TODO (endizhupani@uni-muenster.de): Start the inner points calculation on the GPU.
-
+        auto cpu_adjacent_stream = this->GetCpuAdjacentInnerStream();
 #pragma omp parallel reduction(max \
                                : current_max_difference_)
         {
             int i, j;
 #pragma omp for collapse(2) private(i, j, diff, new_value)
-            for (i = 1; i < this->partition_height_ - 1; i++)
+            for (i = 1; i < cpu_adjacent_stream.gpu_region_start; i++)
                 for (j = 1; j < this->matrix_width_ - 1; j++)
                 {
                     new_value = (this->GetLocal(i - 1, j) + this->GetLocal(i + 1, j) + this->GetLocal(i, j - 1) + this->GetLocal(i, j + 1)) / 4;
@@ -590,7 +663,7 @@ namespace pde_solver
         execution_stats->total_idle_comm_time += (MPI_Wtime() - idle_start);
         execution_stats->total_sweep_time += (MPI_Wtime() - sweep_start);
         execution_stats->n_sweeps += 1;
-        return current_max_difference_;
+        return this->current_max_difference_;
     }
 
     const PartitionNeighbour Matrix::GetNeighbour(PartitionNeighbourType neighbour_type)

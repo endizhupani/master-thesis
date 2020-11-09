@@ -101,7 +101,6 @@ public:
 
     float *d_data;
     float *h_data;
-    float *halo_points;
 
     int halo_points_host_start;
     // Region index where the part of the data that needs to be calculated by the GPU starts
@@ -109,7 +108,7 @@ public:
     // 1. For the top and bottom borders, this indicates the column index
     // 2. For the left and right borders as well as the inner region this indicates the row number.
     // 3. the acutal data transferred to the GPU will contain two more rows/columns on each end that represent the halo.
-    // 4. This value needs to be offset to get the actual starting point.
+    // 4. This value is to be offset to get the actual starting point.
     //  For the left and right border, it should be offset by 1 becuase the first point of the border is calculated by the CPU.
     //  For the top and bottom border it should be offset by 2 because the first point of the row belongs to the side borders and the first point of the border is calculated by the CPU.
     //  For the inner points is should be offset by two because the first and second row if the inner data are the top halo and the top border.

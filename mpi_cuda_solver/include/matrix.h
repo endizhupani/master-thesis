@@ -31,6 +31,7 @@
 #include <cuda_runtime.h>
 #include <cuda.h>
 #include <omp.h>
+#include "kernels.cu"
 #ifndef MATRIX_H
 #define MATRIX_H
 namespace pde_solver
@@ -167,6 +168,12 @@ namespace pde_solver
 
      public:
           void Deallocate();
+
+          const GPUStream GetCpuAdjacentInnerStream();
+          const GPUStream GetStreamForGpuId(int gpu_id);
+          const GPUStream GetLeftBorderStream();
+          const GPUStream GetRightBorderStream();
+
           /**
      * @brief Construct a new Matrix object
      * 
