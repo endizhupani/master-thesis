@@ -359,19 +359,10 @@ void Matrix::AllocateMemory() {
         gpu_execution_plan.GetAbsoluteGpuDataHeight() *
             gpu_execution_plan.GetAbsoluteGpuDataWidth() * sizeof(float)));
 
-    void *d_temp_storage = NULL;
-    size_t temp_storage_bytes = 0;
-
     // Does not perform any calculations. Simply returns the temp storage
     // requirements.
-    cub::DeviceReduce::Max(d_temp_storage, temp_storage_bytes,
-                           d_difference_vector, d_reduction_result,
-                           gpu_execution_plan.GetGpuDataHeight() *
-                               gpu_execution_plan.GetGpuDataWidth());
-
-    CUDA_CHECK_RETURN(cudaMalloc(&d_temp_storage, temp_storage_bytes));
-    op.tmp_data_size_in_bytes = temp_storage_bytes;
-    op.d_tmp_data = d_temp_storage;
+    CUDA_CHECK_RETURN(PrepReductionOperation(op));
+    CUDA_CHECK_RETURN(cudaMalloc(&(op.d_tmp_data), op.tmp_data_size_in_bytes));
 
     this->inner_data_reduction_plans_.push_back(op);
 
@@ -763,24 +754,20 @@ void Matrix::ExecuteGpuWithConcurrentCopy(Matrix new_matrix,
   CUDA_CHECK_RETURN(cudaEventCreateWithFlags(&kernel_computation_complete,
                                              cudaEventDisableTiming));
 
-  jacobiKernel<<<grid_size, block_size, shared_mem_size,
-                 gpu_execution_plan.stream>>>(
-      gpu_execution_plan.d_data, new_matrix_stream.d_data,
-      reduction_operation.d_vector_to_reduce,
-      gpu_execution_plan.GetGpuDataWidth(),
-      gpu_execution_plan.GetGpuDataHeight());
+  LaunchJacobiKernel(gpu_execution_plan.d_data, new_matrix_stream.d_data,
+                     reduction_operation.d_vector_to_reduce,
+                     gpu_execution_plan.GetGpuDataWidth(),
+                     gpu_execution_plan.GetGpuDataHeight(), block_size,
+                     grid_size, shared_mem_size, gpu_execution_plan.stream);
+
   CUDA_CHECK_RETURN(
       cudaEventRecord(kernel_computation_complete, gpu_execution_plan.stream));
   CUDA_CHECK_RETURN(
       cudaStreamWaitEvent(gpu_execution_plan.auxilary_calculation_stream,
                           kernel_computation_complete, 0));
+  CUDA_CHECK_RETURN(LaunchReductionOperation(
+      reduction_operation, gpu_execution_plan.auxilary_calculation_stream));
 
-  cub::DeviceReduce::Max(reduction_operation.d_tmp_data,
-                         reduction_operation.tmp_data_size_in_bytes,
-                         reduction_operation.d_vector_to_reduce,
-                         reduction_operation.d_reduction_result,
-                         reduction_operation.vector_to_reduce_length,
-                         gpu_execution_plan.auxilary_calculation_stream);
   CUDA_CHECK_RETURN(cudaMemcpyAsync(
       reduction_operation.h_reduction_result,
       reduction_operation.d_reduction_result, sizeof(float),

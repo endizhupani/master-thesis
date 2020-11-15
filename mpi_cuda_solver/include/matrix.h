@@ -29,8 +29,6 @@
 #include "math.h"
 #include "mpi.h"
 #include <array>
-#include <cub/device/device_reduce.cuh>
-#include <cub/util_allocator.cuh>
 #include <cuda.h>
 #include <cuda_runtime.h>
 #include <omp.h>

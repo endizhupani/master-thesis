@@ -22,7 +22,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#include "cuda.h"
+//#include "cuda.h"
 #include "cuda_runtime.h"
 #include "math.h"
 #include "mpi.h"
@@ -111,10 +111,10 @@ public:
   float *h_reduction_result;
 
   // size in bytes for the temp data vector required by the reduction operation
-  size_t tmp_data_size_in_bytes;
+  size_t tmp_data_size_in_bytes = 0;
 
   // temp data vector that is used by the reduction operation
-  void *d_tmp_data;
+  void *d_tmp_data = NULL;
 };
 
 struct GpuExecution {

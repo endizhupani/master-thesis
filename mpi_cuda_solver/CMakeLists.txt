@@ -39,7 +39,7 @@
 
 # ================================================ Version that works with Palma =======================================================
 
-cmake_minimum_required (VERSION 3.10.2)
+cmake_minimum_required (VERSION 3.15)
 set(CMAKE_VERBOSE_MAKEFILE ON) 
 set(project_name mpi_cuda_solver)
 project(${project_name})
@@ -93,8 +93,9 @@ set( CMAKE_CUDA_FLAGS_BENCHMARKPALMA "-O3 -arch=compute_35 --expt-extended-lambd
 set(executable ${PROJECT_SOURCE_DIR}/app/main.cu)
 set(executable_name ${project_name}.exe)
 file(GLOB_RECURSE SOURCES "src/*.cpp")
+file(GLOB_RECURSE CUDA_SOURCES "src/*.cu")
 
-add_executable(${executable_name} ${executable} ${SOURCES})
+add_executable(${executable_name} ${executable} ${SOURCES} ${CUDA_SOURCES})
 
 target_compile_features(${executable_name} PUBLIC cxx_std_14)
 target_include_directories(${executable_name} 

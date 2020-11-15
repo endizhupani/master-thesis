@@ -1,9 +1,7 @@
 #include "kernels.cuh"
 
-#include <thrust/detail/config.h>
-#include <thrust/device_vector.h>
-#include <thrust/reduce.h>
-#include <thrust/system/cuda/execution_policy.h>
+#include <cub/device/device_reduce.cuh>
+//#include <cub/util_allocator.cuh>
 
 __global__ void jacobiKernel(float *in, float *out, float *diff,
                              int gpu_data_width, int gpu_data_height) {
@@ -31,17 +29,17 @@ __global__ void jacobiKernel(float *in, float *out, float *diff,
   if (local_y == 1) {
     shared[(local_y - 1) * (smem_width) + local_x] =
         in[(y - 1) * absolute_gpu_data_width + x];
-  } else if (local_y == (smem_height_ - 2)) {
+  } else if (local_y == (smem_height - 2)) {
     shared[(local_y + 1) * (smem_width) + local_x] =
-        in[(y + 1) * absolute_gpu_data_width + x]
+        in[(y + 1) * absolute_gpu_data_width + x];
   }
 
   if (local_x == 1) {
     shared[(local_y) * (smem_width) + local_x - 1] =
         in[y * absolute_gpu_data_width + x - 1];
-  } else if (local_x == (smem_width_ - 2)) {
+  } else if (local_x == (smem_width - 2)) {
     shared[local_y * (smem_width) + local_x + 1] =
-        in[y * absolute_gpu_data_width + x - 1]
+        in[y * absolute_gpu_data_width + x - 1];
   }
 
   __syncwarp();
@@ -64,11 +62,29 @@ __global__ void jacobiKernel(float *in, float *out, float *diff,
       4;
 }
 
-template <typename Iterator, typename T, typename BinaryOperation,
-          typename Pointer>
-__global__ void reduce_kernel(Iterator first, Iterator last, T init,
-                              BinaryOperation binary_op, Pointer result) {
-  *result = thrust::reduce(thrust::cuda::par, first, last, init, binary_op);
+void LaunchJacobiKernel(float *in, float *out, float *diff, int gpu_data_width,
+                        int gpu_data_height, dim3 block_size, dim3 grid_size,
+                        size_t shared_mem_size, cudaStream_t stream) {
+  jacobiKernel<<<grid_size, block_size, shared_mem_size, stream>>>(
+      in, out, diff, gpu_data_width, gpu_data_height);
+}
+
+cudaError_t LaunchReductionOperation(GpuReductionOperation reduction_operation,
+                                     cudaStream_t stream) {
+  return cub::DeviceReduce::Max(reduction_operation.d_tmp_data,
+                                reduction_operation.tmp_data_size_in_bytes,
+                                reduction_operation.d_vector_to_reduce,
+                                reduction_operation.d_reduction_result,
+                                reduction_operation.vector_to_reduce_length,
+                                stream);
+}
+
+cudaError_t PrepReductionOperation(GpuReductionOperation reduction_operation) {
+  return cub::DeviceReduce::Max(reduction_operation.d_tmp_data,
+                                reduction_operation.tmp_data_size_in_bytes,
+                                reduction_operation.d_vector_to_reduce,
+                                reduction_operation.d_reduction_result,
+                                reduction_operation.vector_to_reduce_length);
 }
 
 // TODO: Look into using thrust for the reduction operation.
