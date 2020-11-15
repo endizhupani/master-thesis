@@ -24,22 +24,25 @@
 #include "base_matrix.h"
 #include "mpi.h"
 #include "math.h"
-//#include "device_api.h"
-//#include "launch.h"
+#include "kernels.cuh"
+#include <cub/util_allocator.cuh>
+#include <cub/device/device_reduce.cuh>
 #include <array>
 #include <vector>
 #include <cuda_runtime.h>
 #include <cuda.h>
 #include <omp.h>
-#include "kernels.cu"
+
 #ifndef MATRIX_H
 #define MATRIX_H
 namespace pde_solver
 {
+     // typedef thrust::device_vector<float> vec;
+     // typedef vec *p_vec;
      /**
  * @brief Class that defines a distributed matrix that is partitioned in blocks and distributed with MPI to multiple processors
  * 
- */
+//  */
      class Matrix : public BaseMatrix
      {
      private:
@@ -67,7 +70,14 @@ namespace pde_solver
           // int x_partitions_;
 
           // Neighbours on the top and bottom of the partition
-          std::array<PartitionNeighbour, 4> neighbours;
+          std::array<PartitionNeighbour, 2> neighbours;
+
+          std::vector<float *> device_difference_vectors;
+          std::vector<float *> device_reduction_results;
+          std::vector<size_t> device_reduction_tmp_storage_sizes;
+          std::vector<void *> device_reduction_tmp_storage_data;
+
+          std::vector<GpuReductionOperation> inner_data_gpu_reductions;
 
           // Coordnates of the partition in the cartesian topology
           int partition_coords_[2];
@@ -114,10 +124,10 @@ namespace pde_solver
           // float *right_region;
 
           // Streams for the border calculations. 2 streams for the top and bottom border.
-          GPUStream border_calc_streams[2];
+          GpuExecution border_calc_streams[2];
 
           // Streams that will be used do calculate the inner data of the partition. There will be one stream per GPU. This needs to be a vector because the number of GPUs is not known in advance.
-          GPUStream *inner_data_streams = 0;
+          GpuExecution *inner_data_streams = 0;
 
           float initial_inner_value_;
           float initial_left_value_;
@@ -166,13 +176,15 @@ namespace pde_solver
 
           void AllocateMemory();
 
+          void ExecuteGpuWithConcurrentCopy(Matrix new_matrix, GpuExecution gpu_execution_plan);
+
      public:
           void Deallocate();
 
-          const GPUStream GetCpuAdjacentInnerStream();
-          const GPUStream GetStreamForGpuId(int gpu_id);
-          const GPUStream GetLeftBorderStream();
-          const GPUStream GetRightBorderStream();
+          const GpuExecution GetCpuAdjacentInnerStream();
+          const GpuExecution GetStreamForGpuId(int gpu_id);
+          const GpuExecution GetLeftBorderStream();
+          const GpuExecution GetRightBorderStream();
 
           /**
      * @brief Construct a new Matrix object

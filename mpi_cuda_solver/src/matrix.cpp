@@ -21,6 +21,7 @@
  */
 
 #include "matrix.h"
+//#include "kernels.cu"
 namespace pde_solver
 {
     Matrix::Matrix(int halo_size, int width, int height) : pde_solver::BaseMatrix(width, height)
@@ -102,9 +103,9 @@ namespace pde_solver
         // Bottom Halo initialization
         // If the partition holds the bottom border of the matrix, there is no halo to init.
 
-        float halo_value_inner = this->IsBottomBorder() ? -1 : inner_value;
-        float halo_value_left = this->IsBottomBorder() ? -1 : left_border_value;
-        float halo_value_right = this->IsBottomBorder() ? -1 : right_border_value;
+        halo_value_inner = this->IsBottomBorder() ? -1 : inner_value;
+        halo_value_left = this->IsBottomBorder() ? -1 : left_border_value;
+        halo_value_right = this->IsBottomBorder() ? -1 : right_border_value;
 
         row = inner_data_height - 1;
 
@@ -141,70 +142,71 @@ namespace pde_solver
         // Move data to GPU
         for (int i = 0; i < this->matrix_config_.gpu_number; i++)
         {
-            this->inner_data_streams[i].h_data = &(this->inner_points_[(this->inner_data_streams[i].gpu_region_start - 1) * (this->inner_data_streams[i].gpu_data_width + 2)]);
+            // Assign the pointer to the copy of gpu data on the host. gpu_region_start - 1 rows must be skipped.
+            this->inner_data_streams[i].h_data = &(this->inner_points_[(this->inner_data_streams[i].gpu_region_start - 1) * (this->inner_data_streams[i].GetAbsoluteGpuDataWidth())]);
             cudaSetDevice(this->inner_data_streams[i].gpu_id);
             cudaMemcpyAsync(this->inner_data_streams[i].d_data,
                             this->inner_data_streams[i].h_data,
-                            (this->inner_data_streams[i].gpu_data_width + 2) * (this->inner_data_streams[i].gpu_data_height + 2) * sizeof(float),
+                            (this->inner_data_streams[i].GetAbsoluteGpuDataWidth()) * (this->inner_data_streams[i].GetAbsoluteGpuDataHeight()) * sizeof(float),
                             cudaMemcpyHostToDevice,
                             this->inner_data_streams[i].stream);
         }
 
-        for (int i = 0; i < 2; i++)
-        {
-            if ((i == 0 && !this->IsTopBorder()) ||
-                (i == 1 && !this->IsBottomBorder()))
-            {
-                switch (i)
-                {
-                case 0:
-                    /* code */
-                    cudaSetDevice(this->border_calc_streams[i].gpu_id);
-                    cudaMemcpyAsync(this->border_calc_streams[i].d_data,
-                                    this->inner_points_ + this->border_calc_streams[i].gpu_region_start,
-                                    (this->border_calc_streams[i].gpu_data_width + 2) * sizeof(float),
-                                    cudaMemcpyHostToDevice,
-                                    this->border_calc_streams[i].stream);
-                    cudaMemcpyAsync(this->border_calc_streams[i].d_data + this->border_calc_streams[i].gpu_data_width + 2,
-                                    this->inner_points_ + this->matrix_width_ + this->border_calc_streams[i].gpu_region_start,
-                                    (this->border_calc_streams[i].gpu_data_width + 2) * sizeof(float),
-                                    cudaMemcpyHostToDevice,
-                                    this->border_calc_streams[i].stream);
+        // for (int i = 0; i < 2; i++)
+        // {
+        //     if ((i == 0 && !this->IsTopBorder()) ||
+        //         (i == 1 && !this->IsBottomBorder()))
+        //     {
+        //         switch (i)
+        //         {
+        //         case 0:
+        //             /* code */
+        //             cudaSetDevice(this->border_calc_streams[i].gpu_id);
+        //             cudaMemcpyAsync(this->border_calc_streams[i].d_data,
+        //                             this->inner_points_ + this->border_calc_streams[i].gpu_region_start,
+        //                             (this->border_calc_streams[i].gpu_data_width + 2) * sizeof(float),
+        //                             cudaMemcpyHostToDevice,
+        //                             this->border_calc_streams[i].stream);
+        //             cudaMemcpyAsync(this->border_calc_streams[i].d_data + this->border_calc_streams[i].gpu_data_width + 2,
+        //                             this->inner_points_ + this->matrix_width_ + this->border_calc_streams[i].gpu_region_start,
+        //                             (this->border_calc_streams[i].gpu_data_width + 2) * sizeof(float),
+        //                             cudaMemcpyHostToDevice,
+        //                             this->border_calc_streams[i].stream);
 
-                    cudaMemcpyAsync(this->border_calc_streams[i].d_data + (this->border_calc_streams[i].gpu_data_width + 2) * 2,
-                                    this->inner_points_ + 2 * this->matrix_width_ + this->border_calc_streams[i].gpu_region_start,
-                                    (this->border_calc_streams[i].gpu_data_width + 2) * sizeof(float),
-                                    cudaMemcpyHostToDevice,
-                                    this->border_calc_streams[i].stream);
-                    break;
-                case 1:
-                    // Inner halo for the border
-                    int host_offset = (this->partition_height_ - 1) * this->matrix_width_;
-                    float *first_row_to_copy = this->inner_points_ + host_offset;
-                    cudaSetDevice(this->border_calc_streams[i].gpu_id);
-                    cudaMemcpyAsync(this->border_calc_streams[i].d_data,
-                                    first_row_to_copy + this->border_calc_streams[i].gpu_region_start,
-                                    (this->border_calc_streams[i].gpu_data_width + 2) * sizeof(float),
-                                    cudaMemcpyHostToDevice,
-                                    this->border_calc_streams[i].stream);
-                    cudaMemcpyAsync(this->border_calc_streams[i].d_data + this->border_calc_streams[i].gpu_data_width + 2,
-                                    first_row_to_copy + this->matrix_width_ + this->border_calc_streams[i].gpu_region_start,
-                                    (this->border_calc_streams[i].gpu_data_width + 2) * sizeof(float),
-                                    cudaMemcpyHostToDevice,
-                                    this->border_calc_streams[i].stream);
+        //             cudaMemcpyAsync(this->border_calc_streams[i].d_data + (this->border_calc_streams[i].gpu_data_width + 2) * 2,
+        //                             this->inner_points_ + 2 * this->matrix_width_ + this->border_calc_streams[i].gpu_region_start,
+        //                             (this->border_calc_streams[i].gpu_data_width + 2) * sizeof(float),
+        //                             cudaMemcpyHostToDevice,
+        //                             this->border_calc_streams[i].stream);
+        //             break;
+        //         case 1:
+        //             // Inner halo for the border
+        //             int host_offset = (this->partition_height_ - 1) * this->matrix_width_;
+        //             float *first_row_to_copy = this->inner_points_ + host_offset;
+        //             cudaSetDevice(this->border_calc_streams[i].gpu_id);
+        //             cudaMemcpyAsync(this->border_calc_streams[i].d_data,
+        //                             first_row_to_copy + this->border_calc_streams[i].gpu_region_start,
+        //                             (this->border_calc_streams[i].gpu_data_width + 2) * sizeof(float),
+        //                             cudaMemcpyHostToDevice,
+        //                             this->border_calc_streams[i].stream);
+        //             cudaMemcpyAsync(this->border_calc_streams[i].d_data + this->border_calc_streams[i].gpu_data_width + 2,
+        //                             first_row_to_copy + this->matrix_width_ + this->border_calc_streams[i].gpu_region_start,
+        //                             (this->border_calc_streams[i].gpu_data_width + 2) * sizeof(float),
+        //                             cudaMemcpyHostToDevice,
+        //                             this->border_calc_streams[i].stream);
 
-                    cudaMemcpyAsync(this->border_calc_streams[i].d_data + (this->border_calc_streams[i].gpu_data_width + 2) * 2,
-                                    first_row_to_copy + 2 * this->matrix_width_ + this->border_calc_streams[i].gpu_region_start,
-                                    (this->border_calc_streams[i].gpu_data_width + 2) * sizeof(float),
-                                    cudaMemcpyHostToDevice,
-                                    this->border_calc_streams[i].stream);
-                    break;
-                default:
-                    // TODO (endizhupani@uni-muenster.de): throw an exception
-                    break;
-                }
-            }
-        }
+        //             cudaMemcpyAsync(this->border_calc_streams[i].d_data + (this->border_calc_streams[i].gpu_data_width + 2) * 2,
+        //                             first_row_to_copy + 2 * this->matrix_width_ + this->border_calc_streams[i].gpu_region_start,
+        //                             (this->border_calc_streams[i].gpu_data_width + 2) * sizeof(float),
+        //                             cudaMemcpyHostToDevice,
+        //                             this->border_calc_streams[i].stream);
+        //             break;
+        //         default:
+        //             // TODO (endizhupani@uni-muenster.de): throw an exception
+        //             break;
+        //         }
+        //     }
+        // }
     }
 
     void Matrix::Init(float value, int argc, char *argv[])
@@ -237,12 +239,17 @@ namespace pde_solver
             }
         }
 
-        this->inner_data_streams = new GPUStream[this->matrix_config_.gpu_number];
+        this->inner_data_streams = new GpuExecution[this->matrix_config_.gpu_number];
         // configure inner data streams
         for (int i = 0; i < this->matrix_config_.gpu_number; i++)
         {
             cudaSetDevice(i);
             cudaStreamCreate(&(this->inner_data_streams[i].stream));
+            if (this->inner_data_streams[i].GetConcurrentKernelAndCopy())
+            {
+                cudaStreamCreate(&(this->inner_data_streams[i].auxilary_copy_stream));
+                cudaStreamCreate(&(this->inner_data_streams[i].auxilary_calculation_stream));
+            }
             this->inner_data_streams[i].gpu_id = i;
         }
     }
@@ -251,7 +258,7 @@ namespace pde_solver
     {
         cudaFreeHost(&inner_points_);
 
-        for (int i = 0; i < 4; i++)
+        for (int i = 0; i < 2; i++)
         {
             cudaFree(this->border_calc_streams[i].d_data);
         }
@@ -274,10 +281,12 @@ namespace pde_solver
             total_gpu_rows,
             rows_per_gpu,
             rows_to_allocate,
-            rows_allocated;
+            rows_allocated,
+            inner_rows_start_row_idx;
 
         inner_data_height = this->partition_height_ + 2; // Two extra rows to hold the top and bottom halo
         inner_rows = this->partition_height_ - 2;
+        inner_rows_start_row_idx = 2;
         total_gpu_rows = calc_gpu_rows(inner_rows, 1 - this->matrix_config_.cpu_perc);
         rows_per_gpu = floor(((float)total_gpu_rows) / this->matrix_config_.gpu_number);
         rows_allocated = 0;
@@ -286,38 +295,77 @@ namespace pde_solver
 
         this->top_ghost = &this->inner_points_[0];
         this->bottom_ghost = &this->inner_points_[(inner_data_height - 1) * this->matrix_width_];
-
         for (int i = 0; i < this->matrix_config_.gpu_number; i++)
         {
+            GpuReductionOperation op;
+            op.gpu_id = i;
             // last device should get the remainer of the rows.
             rows_to_allocate = (i = this->matrix_config_.gpu_number - 1) ? (total_gpu_rows - rows_allocated) : rows_per_gpu;
+            this->inner_data_streams[i].SetGpuDataWidth(this->matrix_width_ - 2);
+            this->inner_data_streams[i].SetGpuDataHeight(rows_per_gpu);
             cudaSetDevice(this->inner_data_streams[i].gpu_id);
-            CUDA_CHECK_RETURN(cudaMalloc(&(this->inner_data_streams[i].d_data), (rows_per_gpu + 2) * (this->matrix_width_) * sizeof(float)));
-            rows_allocated += rows_per_gpu;
+            float *d_difference_vector;
+            CUDA_CHECK_RETURN(cudaMalloc(&d_difference_vector,
+                                         this->inner_data_streams[i].GetGpuDataHeight() *
+                                             this->inner_data_streams[i].GetGpuDataWidth() *
+                                             sizeof(float)));
+            op.d_vector_to_reduce = d_difference_vector;
+            op.vector_to_reduce_length = this->inner_data_streams[i].GetGpuDataHeight() *
+                                         this->inner_data_streams[i].GetGpuDataWidth();
+            //this->device_difference_vectors.push_back(d_difference_vector);
+
+            float *d_reduction_result;
+            CUDA_CHECK_RETURN(cudaMalloc(&d_reduction_result, sizeof(float)));
+            op.d_reduction_result = d_difference_vector;
+
+            //this->device_reduction_results.push_back(d_reduction_result);
+
+            CUDA_CHECK_RETURN(cudaMalloc(&(this->inner_data_streams[i].d_data),
+                                         this->inner_data_streams[i].GetAbsoluteGpuDataHeight() *
+                                             this->inner_data_streams[i].GetAbsoluteGpuDataWidth() *
+                                             sizeof(float)));
+
+            void *d_temp_storage = NULL;
+            size_t temp_storage_bytes = 0;
+
+            // This is done to get the requirements for the temp storage.
+            cub::DeviceReduce::Max(d_temp_storage,
+                                   temp_storage_bytes,
+                                   d_difference_vector,
+                                   d_reduction_result,
+                                   this->inner_data_streams[i].GetGpuDataHeight() *
+                                       this->inner_data_streams[i].GetGpuDataWidth());
+
+            CUDA_CHECK_RETURN(cudaMalloc(&d_temp_storage, temp_storage_bytes));
+            op.tmp_data_size_in_bytes = temp_storage_bytes;
+            op.d_tmp_data = d_temp_storage;
+            // this->device_reduction_tmp_storage_data.push_back(d_temp_storage);
+            // this->device_reduction_tmp_storage_sizes.push_back(temp_storage_bytes);
+
+            this->inner_data_gpu_reductions.push_back(op);
             // add 2 to offset the top halo and the top border that are stored on the inner_data variable
-            this->inner_data_streams[i].gpu_region_start = (inner_rows - rows_allocated) + 2;
-            this->inner_data_streams[i].gpu_data_width = this->matrix_width_;
-            this->inner_data_streams[i].gpu_data_height = rows_per_gpu;
+            this->inner_data_streams[i].gpu_region_start = inner_rows + inner_rows_start_row_idx - 1 - (total_gpu_rows - rows_allocated);
+            rows_allocated += rows_per_gpu;
             this->inner_data_streams[i].is_contiguous_on_host = true;
         }
 
-        for (int i = 0; i < 2; i++)
-        {
-            CUDA_CHECK_RETURN(cudaSetDevice(border_calc_streams[i].gpu_id));
-            if (
-                (i == 0 && !this->IsTopBorder()) ||
-                (i == 1 && !this->IsBottomBorder()))
-            {
-                // the top and bottom border are two elements smaller then the partition width.
-                int gpu_elements = calc_gpu_rows(this->matrix_width_ - 2, 1 - this->matrix_config_.cpu_perc);
-                gpu_elements += 2; // add two for the left and right halo cells.
-                gpu_elements *= 3; // multiply by 3 because three columns will need to be stored. the top nd bottom halo of each border needs to be stored.
-                CUDA_CHECK_RETURN(cudaMalloc(&(border_calc_streams[i].d_data), gpu_elements * sizeof(float)));
+        // for (int i = 0; i < 2; i++)
+        // {
+        //     CUDA_CHECK_RETURN(cudaSetDevice(border_calc_streams[i].gpu_id));
+        //     if (
+        //         (i == 0 && !this->IsTopBorder()) ||
+        //         (i == 1 && !this->IsBottomBorder()))
+        //     {
+        //         // the top and bottom border are two elements smaller then the partition width.
+        //         int gpu_elements = calc_gpu_rows(this->matrix_width_ - 2, 1 - this->matrix_config_.cpu_perc);
+        //         gpu_elements += 2; // add two for the left and right halo cells.
+        //         gpu_elements *= 3; // multiply by 3 because three columns will need to be stored. the top nd bottom halo of each border needs to be stored.
+        //         CUDA_CHECK_RETURN(cudaMalloc(&(border_calc_streams[i].d_data), gpu_elements * sizeof(float)));
 
-                // remove one from the matrix width
-                this->border_calc_streams[i].gpu_region_start = this->matrix_width_ - 1 - gpu_elements;
-            }
-        }
+        //         // remove one from the matrix width
+        //         this->border_calc_streams[i].gpu_region_start = this->matrix_width_ - 1 - gpu_elements;
+        //     }
+        // }
     }
 
     void Matrix::Init(float inner_value, float left_border_value, float right_border_value, float bottom_border_value, float top_border_value, int argc, char *argv[])
@@ -422,12 +470,12 @@ namespace pde_solver
         }
     }
 
-    const GPUStream Matrix::GetCpuAdjacentInnerStream()
+    const GpuExecution Matrix::GetCpuAdjacentInnerStream()
     {
         return this->GetStreamForGpuId(0);
     }
 
-    const GPUStream Matrix::GetStreamForGpuId(int gpu_id)
+    const GpuExecution Matrix::GetStreamForGpuId(int gpu_id)
     {
         for (size_t i = 0; i < this->matrix_config_.gpu_number; i++)
         {
@@ -438,44 +486,44 @@ namespace pde_solver
         }
     }
 
-    const GPUStream Matrix::GetRightBorderStream()
+    const GpuExecution Matrix::GetRightBorderStream()
     {
         return this->border_calc_streams[1];
     }
 
-    const GPUStream Matrix::GetLeftBorderStream()
+    const GpuExecution Matrix::GetLeftBorderStream()
     {
         return this->border_calc_streams[0];
     }
 
     float Matrix::LocalSweep(Matrix new_matrix, ExecutionStats *execution_stats)
     {
-        for (int i = 0; i < this->matrix_config_.gpu_number; i++)
-        {
-            auto stream = this->GetStreamForGpuId(i);
-            cudaSetDevice(stream.gpu_id);
+        // for (int i = 0; i < this->matrix_config_.gpu_number; i++)
+        // {
+        //     auto stream = this->GetStreamForGpuId(i);
+        //     cudaSetDevice(stream.gpu_id);
 
-            // move top border to the host data
-            cudaMemcpyAsync(stream.h_data + stream.gpu_data_width + 2,
-                            stream.d_data + stream.gpu_data_width + 2,
-                            (stream.gpu_data_width + 2) + 2,
-                            cudaMemcpyDeviceToHost,
-                            stream.stream);
+        //     // move top border to the host data. Top halo of the GPU data will be skipped. Left and right halo must be skipped.
+        //     cudaMemcpyAsync(stream.h_data + stream.GetAbsoluteGpuDataWidth() + 1,
+        //                     stream.d_data + stream.GetAbsoluteGpuDataWidth() + 1,
+        //                     stream.GetGpuDataWidth() * sizeof(float),
+        //                     cudaMemcpyDeviceToHost,
+        //                     stream.stream);
 
-            // move bottom border to the host data
-            cudaMemcpyAsync(stream.h_data + ((stream.gpu_data_width + 2) * stream.gpu_data_height),
-                            stream.d_data + ((stream.gpu_data_width + 2) * stream.gpu_data_height),
-                            (stream.gpu_data_width + 2) + 2,
-                            cudaMemcpyDeviceToHost,
-                            stream.stream);
-        }
+        //     // move bottom border to the host data. Left and right halo must be skipped.
+        //     cudaMemcpyAsync(stream.h_data + (stream.GetAbsoluteGpuDataWidth() * stream.GetGpuDataHeight()) + 1,
+        //                     stream.d_data + (stream.GetAbsoluteGpuDataWidth() * stream.GetGpuDataHeight()) + 1,
+        //                     stream.GetGpuDataWidth() * sizeof(float),
+        //                     cudaMemcpyDeviceToHost,
+        //                     stream.stream);
+        // }
 
-        for (int i = 0; i < this->matrix_config_.gpu_number; i++)
-        {
-            auto stream = this->GetStreamForGpuId(i);
-            cudaSetDevice(stream.gpu_id);
-            cudaStreamSynchronize(stream.stream);
-        }
+        // for (int i = 0; i < this->matrix_config_.gpu_number; i++)
+        // {
+        //     auto stream = this->GetStreamForGpuId(i);
+        //     cudaSetDevice(stream.gpu_id);
+        //     cudaStreamSynchronize(stream.stream);
+        // }
 
         for (int i = 0; i < this->matrix_config_.gpu_number; i++)
         {
@@ -483,16 +531,16 @@ namespace pde_solver
             cudaSetDevice(stream.gpu_id);
 
             // move top halo to the gpu data
-            cudaMemcpyAsync(stream.d_data,
-                            stream.h_data,
-                            (stream.gpu_data_width + 2) + 2,
+            cudaMemcpyAsync(stream.d_data + 1,
+                            stream.h_data + 1,
+                            stream.GetGpuDataWidth() * sizeof(float),
                             cudaMemcpyHostToDevice,
                             stream.stream);
 
             // move bottom halo to the gpu data
-            cudaMemcpyAsync(stream.d_data + (stream.gpu_data_width + 2) * (stream.gpu_data_height + 1),
-                            stream.h_data + (stream.gpu_data_width + 2) * (stream.gpu_data_height + 1),
-                            (stream.gpu_data_width + 2) + 2,
+            cudaMemcpyAsync(stream.d_data + stream.GetAbsoluteGpuDataWidth() * (stream.GetGpuDataHeight() + 1) + 1,
+                            stream.h_data + stream.GetAbsoluteGpuDataWidth() * (stream.GetGpuDataHeight() + 1) + 1,
+                            stream.GetGpuDataWidth() * sizeof(float),
                             cudaMemcpyHostToDevice,
                             stream.stream);
         }
@@ -631,10 +679,14 @@ namespace pde_solver
         execution_stats->total_border_calc_time += (MPI_Wtime() - border_start);
 
         auto inner_points_time = MPI_Wtime();
+        float *max_differences = new float[this->matrix_config_.gpu_number];
         for (int i = 0; i < this->matrix_config_.gpu_number; i++)
         {
-            dim3 block_size();
-            cudaSetDevice(i);
+            GpuExecution execution_plan = this->GetStreamForGpuId(i);
+            if (execution_plan.GetConcurrentKernelAndCopy())
+            {
+                this->ExecuteGpuWithConcurrentCopy(new_matrix, execution_plan);
+            }
         }
 
         auto cpu_adjacent_stream = this->GetCpuAdjacentInnerStream();
@@ -664,6 +716,45 @@ namespace pde_solver
         execution_stats->total_sweep_time += (MPI_Wtime() - sweep_start);
         execution_stats->n_sweeps += 1;
         return this->current_max_difference_;
+    }
+
+    void Matrix::ExecuteGpuWithConcurrentCopy(Matrix new_matrix, GpuExecution gpu_execution_plan)
+    {
+        cudaEvent_t kernel_computation_complete;
+        CUDA_CHECK_RETURN(cudaEventCreateWithFlags(&kernel_computation_complete, cudaEventDisableTiming));
+        //GpuExecution stream = this->GetStreamForGpuId(i);
+        dim3 block_size(gpu_execution_plan.GetGpuBlockSizeX(), gpu_execution_plan.GetGpuBlockSizeY());
+        dim3 grid_size(gpu_execution_plan.GetGpuGridSizeX(), gpu_execution_plan.GetGpuBlockSizeY());
+
+        CUDA_CHECK_RETURN(cudaSetDevice(gpu_execution_plan.gpu_id));
+        // https://codeyarns.com/tech/2011-04-09-how-to-pass-thrust-device-vector-to-kernel.html
+        // As described in this URL we can have difference vectors passed to the kernel and then have thrust perform the difference reduction.
+        // TODO (endizhupani@uni-muenster.de): The transfer of the borders can probably be overlapped with the computation of the differences
+        //float *diff_thrust = thrust::raw_pointer_cast(difference_thrust_vectors[i]->begin());
+        GpuExecution new_matrix_stream = new_matrix.GetStreamForGpuId(gpu_execution_plan.gpu_id);
+        size_t shared_mem_size = gpu_execution_plan.GetAbsoluteGpuDataHeight() * gpu_execution_plan.GetAbsoluteGpuDataWidth() * sizeof(float);
+        jacobiKernel<<<grid_size, block_size, shared_mem_size, gpu_execution_plan.stream>>>(gpu_execution_plan.d_data, new_matrix_stream.d_data, this->device_difference_vectors[gpu_execution_plan.gpu_id], gpu_execution_plan.GetGpuDataWidth(), gpu_execution_plan.GetGpuDataHeight());
+        CUDA_CHECK_RETURN(cudaEventRecord(kernel_computation_complete, gpu_execution_plan.stream));
+        CUDA_CHECK_RETURN(cudaStreamWaitEvent(gpu_execution_plan.auxilary_calculation_stream, kernel_computation_complete, 0));
+        cub::DeviceReduce::Max(
+            this->device_reduction_tmp_storage_data[gpu_execution_plan.gpu_id],
+            this->device_reduction_tmp_storage_sizes[gpu_execution_plan.gpu_id],
+            this->device_difference_vectors[gpu_execution_plan.gpu_id],
+            this->device_reduction_results[gpu_execution_plan.gpu_id], )
+            // move top border to the host data. Top halo of the GPU data will be skipped. Left and right halo must be skipped.
+            CUDA_CHECK_RETURN(cudaMemcpyAsync(gpu_execution_plan.h_data + gpu_execution_plan.GetAbsoluteGpuDataWidth() + 1,
+                                              gpu_execution_plan.d_data + gpu_execution_plan.GetAbsoluteGpuDataWidth() + 1,
+                                              gpu_execution_plan.GetGpuDataWidth() * sizeof(float),
+                                              cudaMemcpyDeviceToHost,
+                                              gpu_execution_plan.stream));
+
+        // move bottom border to the host data. Left and right halo must be skipped.
+        CUDA_CHECK_RETURN(cudaStreamWaitEvent(gpu_execution_plan.auxilary_copy_stream, kernel_computation_complete, 0));
+        CUDA_CHECK_RETURN(cudaMemcpyAsync(gpu_execution_plan.h_data + (gpu_execution_plan.GetAbsoluteGpuDataWidth() * gpu_execution_plan.GetGpuDataHeight()) + 1,
+                                          gpu_execution_plan.d_data + (gpu_execution_plan.GetAbsoluteGpuDataWidth() * gpu_execution_plan.GetGpuDataHeight()) + 1,
+                                          gpu_execution_plan.GetGpuDataWidth() * sizeof(float),
+                                          cudaMemcpyDeviceToHost,
+                                          gpu_execution_plan.auxilary_copy_stream));
     }
 
     const PartitionNeighbour Matrix::GetNeighbour(PartitionNeighbourType neighbour_type)
@@ -739,7 +830,7 @@ namespace pde_solver
 
     void Matrix::ShowMatrix()
     {
-        float *partition_data = this->AssemblePartition();
+        float *partition_data = inner_points_; //this->AssemblePartition();
         float *matrix;
         if (this->proc_id_ == 0)
         {

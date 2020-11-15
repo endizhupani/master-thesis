@@ -24,6 +24,8 @@
 #include <iostream>
 #include "cuda.h"
 #include "cuda_runtime.h"
+#include "math.h"
+
 #ifndef COMMON_H
 #define COMMON_H
 
@@ -90,32 +92,168 @@ enum StorageType
     COL_MAJOR
 };
 
-struct GPUStream
+/**
+ * @brief Structure describing a GPU Reduction operation
+ * 
+ */
+struct GpuReductionOperation
 {
+public:
+    // Id of the GPU where the reduction operation will be run on.
+    int gpu_id;
+
+    // pointer to the device vector that needs to be reduced
+    float *d_vector_to_reduce;
+
+    // length of the vector to reduce
+    int vector_to_reduce_length;
+
+    // pointer to the reduction result stored in the device's global memory
+    float *d_reduction_result;
+
+    // size in bytes for the temp data vector required by the reduction operation
+    size_t tmp_data_size_in_bytes;
+
+    // temp data vector that is used by the reduction operation
+    void *d_tmp_data;
+};
+
+struct GpuExecution
+{
+#define DEFAULT_BLOCK_DIM 16
+private:
+    int gpu_block_size_x = 0;
+    int gpu_block_size_y = 0;
+    int gpu_grid_size_x = 0;
+    int gpu_grid_size_y = 0;
+    int gpu_data_width = 0;
+    int gpu_data_height = 0;
+
+    bool concurrentKernelCopy;
+
+    void AdjustGridAndBlockSizes()
+    {
+        if (gpu_data_height % DEFAULT_BLOCK_DIM > ((double)DEFAULT_BLOCK_DIM / 2))
+        {
+            gpu_block_size_y = DEFAULT_BLOCK_DIM / 2;
+        }
+        else
+        {
+            gpu_block_size_y = DEFAULT_BLOCK_DIM;
+        }
+
+        gpu_grid_size_y = ceil(gpu_block_size_y / GetGpuBlockSizeY());
+
+        if (gpu_data_width % DEFAULT_BLOCK_DIM > ((double)DEFAULT_BLOCK_DIM / 2))
+        {
+            gpu_block_size_x = DEFAULT_BLOCK_DIM / 2;
+        }
+        else
+        {
+            gpu_block_size_x = DEFAULT_BLOCK_DIM;
+        }
+
+        gpu_grid_size_x = ceil(gpu_block_size_x / GetGpuBlockSizeX());
+    }
+
 public:
     // The device number on which the stream is allocated.
     int gpu_id;
 
     // The stream created on the gpu
     cudaStream_t stream;
+    cudaStream_t auxilary_copy_stream;
+    cudaStream_t auxilary_calculation_stream;
 
     float *d_data;
     float *h_data;
 
     int halo_points_host_start;
-    // Region index where the part of the data that needs to be calculated by the GPU starts
-    // Important to note here is:
-    // 1. For the top and bottom borders, this indicates the column index
-    // 2. For the left and right borders as well as the inner region this indicates the row number.
-    // 3. the acutal data transferred to the GPU will contain two more rows/columns on each end that represent the halo.
-    // 4. This value is to be offset to get the actual starting point.
-    //  For the left and right border, it should be offset by 1 becuase the first point of the border is calculated by the CPU.
-    //  For the top and bottom border it should be offset by 2 because the first point of the row belongs to the side borders and the first point of the border is calculated by the CPU.
-    //  For the inner points is should be offset by two because the first and second row if the inner data are the top halo and the top border.
+
+    // this is the row index where the gpu data starts. Note that in the calculation of this index, the top and bottom halos of the partition and top and bottom halos of the GPU data are calculated.
     int gpu_region_start;
-    int gpu_data_width;
-    int gpu_data_height;
+
     bool is_contiguous_on_host;
+
+    void SetDeviceProperties(cudaDeviceProp deviceProp)
+    {
+        concurrentKernelCopy = deviceProp.deviceOverlap;
+    }
+    const bool GetConcurrentKernelAndCopy()
+    {
+        return concurrentKernelCopy;
+    }
+    /**
+ * @brief Set the Gpu Data Height. Note that this should be the height of only the data that is calculated by the GPU. it should not include halo cells.
+ * 
+ * @param height 
+ */
+    void SetGpuDataHeight(const int height)
+    {
+        gpu_data_height = height;
+        if (gpu_data_width <= 0)
+        {
+            return;
+        }
+
+        AdjustGridAndBlockSizes();
+    }
+
+    /**
+     * @brief Set the Gpu Data Width. Note that this should be the width of only the data that is calculated by the GPU. it should not include halo cells.
+     * 
+     * @param width 
+     */
+    void SetGpuDataWidth(const int width)
+    {
+        gpu_data_width = width;
+        if (gpu_data_height <= 0)
+        {
+            return;
+        }
+
+        AdjustGridAndBlockSizes();
+    }
+
+    int GetGpuDataHeight()
+    {
+        return gpu_data_height;
+    }
+
+    int GetAbsoluteGpuDataHeight()
+    {
+        return gpu_data_height + 2;
+    }
+
+    int GetGpuDataWidth()
+    {
+        return gpu_data_width;
+    }
+
+    int GetAbsoluteGpuDataWidth()
+    {
+        return gpu_data_width + 2;
+    }
+
+    int GetGpuBlockSizeY()
+    {
+        return gpu_block_size_y;
+    }
+
+    int GetGpuBlockSizeX()
+    {
+        return gpu_block_size_x;
+    }
+
+    int GetGpuGridSizeX()
+    {
+        return gpu_grid_size_x;
+    }
+
+    int GetGpuGridSizeY()
+    {
+        return gpu_grid_size_y;
+    }
 };
 
 struct ExecutionStats
