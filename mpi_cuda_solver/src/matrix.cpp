@@ -255,34 +255,48 @@ void Matrix::ConfigGpuExecution() {
     }
   }
 
-  this->inner_data_execution_plans_ =
-      new GpuExecution[this->matrix_config_.gpu_number];
+  //   this->inner_data_execution_plans_ =
+  //       new GpuExecution[this->matrix_config_.gpu_number];
   // configure inner data streams
   for (int i = 0; i < this->matrix_config_.gpu_number; i++) {
+    GpuExecution plan;
     CUDA_CHECK_RETURN(cudaSetDevice(i));
     CUDA_CHECK_RETURN(cudaGetDeviceProperties(&device_prop, i));
-    this->inner_data_execution_plans_[i].SetDeviceProperties(device_prop);
-    CUDA_CHECK_RETURN(
-        cudaStreamCreate(&(this->inner_data_execution_plans_[i].stream)));
-    if (this->inner_data_execution_plans_[i].GetConcurrentKernelAndCopy()) {
-      CUDA_CHECK_RETURN(cudaStreamCreate(
-          &(this->inner_data_execution_plans_[i].auxilary_copy_stream)));
-      CUDA_CHECK_RETURN(cudaStreamCreate(
-          &(this->inner_data_execution_plans_[i].auxilary_calculation_stream)));
+    plan.SetDeviceProperties(device_prop);
+    CUDA_CHECK_RETURN(cudaStreamCreate(&(plan.stream)));
+    if (plan.GetConcurrentKernelAndCopy()) {
+      CUDA_CHECK_RETURN(cudaStreamCreate(&(plan.auxilary_copy_stream)));
+      CUDA_CHECK_RETURN(cudaStreamCreate(&(plan.auxilary_calculation_stream)));
     }
-    this->inner_data_execution_plans_[i].gpu_id = i;
+    plan.gpu_id = i;
+    this->inner_data_execution_plans_.push_back(plan);
   }
 }
 
 void Matrix::Deallocate() {
-  cudaFreeHost(&inner_points_);
+  CUDA_CHECK_RETURN(cudaFreeHost(&inner_points_));
   for (int i = 0; i < 2; i++) {
-    cudaFree(this->border_execution_plans_[i].d_data);
+    CUDA_CHECK_RETURN(cudaSetDevice(this->border_execution_plans_[i].gpu_id));
+    CUDA_CHECK_RETURN(cudaFree(this->border_execution_plans_[i].d_data));
   }
 
   for (int i = 0; i < this->matrix_config_.gpu_number; i++) {
-    cudaFree(this->inner_data_execution_plans_[i].d_data);
+    CUDA_CHECK_RETURN(
+        cudaSetDevice(this->inner_data_execution_plans_[i].gpu_id));
+    CUDA_CHECK_RETURN(cudaFree(this->inner_data_execution_plans_[i].d_data));
   }
+
+  for (int i = 0; i < this->inner_data_reduction_plans_.size(); i++) {
+    CUDA_CHECK_RETURN(
+        cudaSetDevice(this->inner_data_reduction_plans_[i].gpu_id));
+    CUDA_CHECK_RETURN(
+        cudaFree(this->inner_data_reduction_plans_[i].d_reduction_result));
+    CUDA_CHECK_RETURN(
+        cudaFree(this->inner_data_reduction_plans_[i].d_tmp_data));
+    CUDA_CHECK_RETURN(
+        cudaFree(this->inner_data_reduction_plans_[i].d_vector_to_reduce));
+  }
+
   // TODO (endizhupani@uni-muenster.de): Add code to deallocate the rest of the
   // data.
 }
@@ -494,7 +508,7 @@ const GpuExecution &Matrix::GetCpuAdjacentInnerDataGpuPlan() {
 }
 
 const GpuExecution &Matrix::GetInnerDataPlanForGpuId(int gpu_id) {
-  for (size_t i = 0; i < this->matrix_config_.gpu_number; i++) {
+  for (size_t i = 0; i < this->inner_data_execution_plans_.size(); i++) {
     if (this->inner_data_execution_plans_[i].gpu_id == gpu_id) {
       return this->inner_data_execution_plans_[i];
     }
@@ -661,7 +675,6 @@ float Matrix::LocalSweep(Matrix new_matrix, ExecutionStats *execution_stats) {
   execution_stats->total_border_calc_time += (MPI_Wtime() - border_start);
 
   auto inner_points_time = MPI_Wtime();
-  float *max_differences = new float[this->matrix_config_.gpu_number];
   for (int i = 0; i < this->matrix_config_.gpu_number; i++) {
     GpuExecution execution_plan = this->GetInnerDataPlanForGpuId(i);
     if (execution_plan.GetConcurrentKernelAndCopy()) {
@@ -702,6 +715,14 @@ float Matrix::LocalSweep(Matrix new_matrix, ExecutionStats *execution_stats) {
       CUDA_CHECK_RETURN(
           cudaStreamSynchronize(execution_plan.auxilary_copy_stream));
     }
+  }
+
+  // consolidate reduction
+  for (int i = 0; i < this->inner_data_reduction_plans_.size(); i++) {
+    if (*(this->inner_data_reduction_plans_[i].h_reduction_result) >
+        this->current_max_difference_)
+      this->current_max_difference_ =
+          *(this->inner_data_reduction_plans_[i].h_reduction_result);
   }
 
   execution_stats->total_idle_comm_time += (MPI_Wtime() - idle_start);
@@ -760,7 +781,10 @@ void Matrix::ExecuteGpuWithConcurrentCopy(Matrix new_matrix,
                          reduction_operation.d_reduction_result,
                          reduction_operation.vector_to_reduce_length,
                          gpu_execution_plan.auxilary_calculation_stream);
-
+  CUDA_CHECK_RETURN(cudaMemcpyAsync(
+      reduction_operation.h_reduction_result,
+      reduction_operation.d_reduction_result, sizeof(float),
+      cudaMemcpyDeviceToHost, gpu_execution_plan.auxilary_calculation_stream));
   int transfer_start_idx = gpu_execution_plan.GetAbsoluteGpuDataWidth() + 1;
 
   // move top border to the host data. Top halo of the GPU data will be skipped.

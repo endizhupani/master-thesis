@@ -108,6 +108,8 @@ public:
   // pointer to the reduction result stored in the device's global memory
   float *d_reduction_result;
 
+  float *h_reduction_result;
+
   // size in bytes for the temp data vector required by the reduction operation
   size_t tmp_data_size_in_bytes;
 

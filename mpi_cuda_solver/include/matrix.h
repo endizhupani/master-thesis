@@ -130,7 +130,7 @@ private:
   // Streams that will be used do calculate the inner data of the partition.
   // There will be one stream per GPU. This needs to be a vector because the
   // number of GPUs is not known in advance.
-  GpuExecution *inner_data_execution_plans_ = 0;
+  std::vector<GpuExecution> inner_data_execution_plans_;
 
 #pragma endregion
 
