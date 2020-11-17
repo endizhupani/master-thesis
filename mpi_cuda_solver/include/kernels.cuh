@@ -25,15 +25,17 @@
 #define KERNELS
 #include "common.h"
 __global__ void jacobiKernel(float *in, float *out, float *diff,
-                             int gpu_data_width, int gpu_data_height);
+                             int gpu_data_width, int gpu_data_height,
+                             int smem_width, int smem_height);
 
 void LaunchJacobiKernel(float *in, float *out, float *diff, int gpu_data_width,
-                        int gpu_data_height, dim3 block_size, dim3 grid_size,
-                        size_t shared_mem_size, cudaStream_t stream);
+                        int gpu_data_height, int smem_width, int smem_height,
+                        dim3 block_size, dim3 grid_size, size_t shared_mem_size,
+                        cudaStream_t stream);
 
-cudaError_t LaunchReductionOperation(GpuReductionOperation reduction_operation,
+cudaError_t LaunchReductionOperation(GpuReductionOperation &reduction_operation,
                                      cudaStream_t stream);
 
-cudaError_t PrepReductionOperation(GpuReductionOperation reduction_operation);
+cudaError_t PrepReductionOperation(GpuReductionOperation &reduction_operation);
 
 #endif

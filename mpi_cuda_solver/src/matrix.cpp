@@ -54,7 +54,7 @@ MPI_Comm Matrix::GetCartesianCommunicator() {
 }
 
 Matrix Matrix::CloneShell() {
-  Matrix m(this->halo_size_, this->matrix_width_, this->matrix_height_);
+  Matrix m(this->matrix_config_);
   m.neighbours = this->neighbours;
   m.partition_coords_[0] = this->partition_coords_[0];
   m.partition_coords_[1] = this->partition_coords_[1];
@@ -105,7 +105,6 @@ void Matrix::InitData(float inner_value, float left_border_value,
   }
 
   this->inner_points_[inner_data_width - 1] = halo_value_right;
-
   // Bottom Halo initialization
   // If the partition holds the bottom border of the matrix, there is no halo to
   // init.
@@ -127,34 +126,40 @@ void Matrix::InitData(float inner_value, float left_border_value,
       halo_value_right;
 
   // Inner data
-  for (int i = 1; i < inner_data_rows - 1; i++) {
+  for (int i = 0; i < this->partition_height_; i++) {
     for (int j = 0; j < inner_data_width; j++) {
-      if (this->IsTopBorder() && i == 1) {
-        this->SetLocal(top_border_value, i, j);
-      } else if (this->IsBottomBorder() && i == (inner_data_rows - 2)) {
-        this->SetLocal(bottom_border_value, i, j);
-      } else {
-        this->SetLocal(inner_value, i, j);
+      auto value = inner_value;
+      if (this->IsTopBorder() && i == 0) {
+        value = top_border_value;
+      } else if (this->IsBottomBorder() && i == (this->partition_height_ - 1)) {
+        value = bottom_border_value;
       }
+      if (j == 0) {
+        value = left_border_value;
+      } else if (j == inner_data_width - 1) {
+        value = right_border_value;
+      }
+      this->SetLocal(value, i, j);
     }
   }
-
   // Move data to GPU
   for (int i = 0; i < this->matrix_config_.gpu_number; i++) {
     // Assign the pointer to the copy of gpu data on the host. gpu_region_start
     // - 1 rows must be skipped.
-    this->inner_data_execution_plans_[i].h_data = &(
-        this->inner_points_
-            [(this->inner_data_execution_plans_[i].gpu_region_start - 1) *
-             (this->inner_data_execution_plans_[i].GetAbsoluteGpuDataWidth())]);
-    cudaSetDevice(this->inner_data_execution_plans_[i].gpu_id);
-    cudaMemcpyAsync(
-        this->inner_data_execution_plans_[i].d_data,
-        this->inner_data_execution_plans_[i].h_data,
-        (this->inner_data_execution_plans_[i].GetAbsoluteGpuDataWidth()) *
-            (this->inner_data_execution_plans_[i].GetAbsoluteGpuDataHeight()) *
-            sizeof(float),
-        cudaMemcpyHostToDevice, this->inner_data_execution_plans_[i].stream);
+    GpuExecution &plan = this->GetInnerDataPlanForGpuId(i);
+    plan.h_d_data_mirror = &(this->inner_points_[(plan.GetGpuDataStartRow()) *
+                                                 (plan.GetGpuDataWidth())]);
+    CUDA_CHECK_RETURN(cudaSetDevice(plan.gpu_id));
+    CUDA_CHECK_RETURN(cudaMemcpyAsync(
+        plan.d_data, plan.h_d_data_mirror,
+        (plan.GetGpuDataWidth()) * (plan.GetGpuDataHeight()) * sizeof(float),
+        cudaMemcpyHostToDevice, plan.stream));
+  }
+
+  for (int i = 0; i < this->matrix_config_.gpu_number; i++) {
+    GpuExecution &plan = this->GetInnerDataPlanForGpuId(i);
+    CUDA_CHECK_RETURN(cudaSetDevice(plan.gpu_id));
+    CUDA_CHECK_RETURN(cudaStreamSynchronize(plan.stream));
   }
 
   // for (int i = 0; i < 2; i++)
@@ -274,11 +279,11 @@ void Matrix::ConfigGpuExecution() {
 }
 
 void Matrix::Deallocate() {
-  CUDA_CHECK_RETURN(cudaFreeHost(&inner_points_));
-  for (int i = 0; i < 2; i++) {
-    CUDA_CHECK_RETURN(cudaSetDevice(this->border_execution_plans_[i].gpu_id));
-    CUDA_CHECK_RETURN(cudaFree(this->border_execution_plans_[i].d_data));
-  }
+  CUDA_CHECK_RETURN(cudaFreeHost(inner_points_));
+  // for (int i = 0; i < 2; i++) {
+  //   CUDA_CHECK_RETURN(cudaSetDevice(this->border_execution_plans_[i].gpu_id));
+  //   CUDA_CHECK_RETURN(cudaFree(this->border_execution_plans_[i].d_data));
+  // }
 
   for (int i = 0; i < this->matrix_config_.gpu_number; i++) {
     CUDA_CHECK_RETURN(
@@ -328,7 +333,7 @@ void Matrix::AllocateMemory() {
       &this->inner_points_[(inner_data_rows - 1) * this->matrix_width_];
 
   for (int i = 0; i < this->matrix_config_.gpu_number; i++) {
-    auto gpu_execution_plan = this->GetInnerDataPlanForGpuId(i);
+    GpuExecution &gpu_execution_plan = this->GetInnerDataPlanForGpuId(i);
 
     // last device should get the remainer of the rows.
     rows_to_allocate = (i = this->matrix_config_.gpu_number - 1)
@@ -341,23 +346,21 @@ void Matrix::AllocateMemory() {
 
     GpuReductionOperation op;
     op.gpu_id = i;
-    float *d_difference_vector;
-    CUDA_CHECK_RETURN(cudaMalloc(&d_difference_vector,
+    CUDA_CHECK_RETURN(cudaMalloc(
+        &(op.d_vector_to_reduce),
+        gpu_execution_plan.GetGpuCalculatedRegionHeight() *
+            gpu_execution_plan.GetGpuCalculatedRegionWidth() * sizeof(float)));
+    op.vector_to_reduce_length =
+        gpu_execution_plan.GetGpuCalculatedRegionHeight() *
+        gpu_execution_plan.GetGpuCalculatedRegionWidth();
+
+    CUDA_CHECK_RETURN(cudaMalloc(&(op.d_reduction_result), sizeof(float)));
+    CUDA_CHECK_RETURN(cudaMallocHost(&(op.h_reduction_result), sizeof(float)));
+
+    CUDA_CHECK_RETURN(cudaMalloc(&(gpu_execution_plan.d_data),
                                  gpu_execution_plan.GetGpuDataHeight() *
                                      gpu_execution_plan.GetGpuDataWidth() *
                                      sizeof(float)));
-    op.d_vector_to_reduce = d_difference_vector;
-    op.vector_to_reduce_length = gpu_execution_plan.GetGpuDataHeight() *
-                                 gpu_execution_plan.GetGpuDataWidth();
-
-    float *d_reduction_result;
-    CUDA_CHECK_RETURN(cudaMalloc(&d_reduction_result, sizeof(float)));
-    op.d_reduction_result = d_reduction_result;
-
-    CUDA_CHECK_RETURN(cudaMalloc(
-        &(gpu_execution_plan.d_data),
-        gpu_execution_plan.GetAbsoluteGpuDataHeight() *
-            gpu_execution_plan.GetAbsoluteGpuDataWidth() * sizeof(float)));
 
     // Does not perform any calculations. Simply returns the temp storage
     // requirements.
@@ -366,9 +369,9 @@ void Matrix::AllocateMemory() {
 
     this->inner_data_reduction_plans_.push_back(op);
 
-    gpu_execution_plan.gpu_region_start = inner_rows +
-                                          inner_rows_start_row_idx - 1 -
-                                          (total_gpu_rows - rows_allocated);
+    gpu_execution_plan.SetGpuCalculationStartRow(
+        inner_rows + inner_rows_start_row_idx -
+        (total_gpu_rows - rows_allocated));
     rows_allocated += rows_per_gpu;
     gpu_execution_plan.is_contiguous_on_host = true;
   }
@@ -492,16 +495,38 @@ void Matrix::Finalize() {
     printf("MPi Finalize, process %d, return code: %d\n", this->proc_id_,
            result);
   }
+
+  for (size_t i = 0; i < 2; i++) {
+    CUDA_CHECK_RETURN(cudaSetDevice(this->border_execution_plans_[i].gpu_id));
+    CUDA_CHECK_RETURN(
+        cudaStreamDestroy(this->border_execution_plans_[i].stream));
+    if (this->border_execution_plans_[i].GetConcurrentKernelAndCopy()) {
+      CUDA_CHECK_RETURN(cudaStreamDestroy(
+          this->border_execution_plans_[i].auxilary_calculation_stream));
+      CUDA_CHECK_RETURN(cudaStreamDestroy(
+          this->border_execution_plans_[i].auxilary_copy_stream));
+    }
+  }
+
+  for (size_t i = 0; i < this->inner_data_execution_plans_.size(); i++) {
+    GpuExecution &plan = this->GetInnerDataPlanForGpuId(i);
+    CUDA_CHECK_RETURN(cudaSetDevice(plan.gpu_id));
+    CUDA_CHECK_RETURN(cudaStreamDestroy(plan.stream));
+    if (this->border_execution_plans_[i].GetConcurrentKernelAndCopy()) {
+      CUDA_CHECK_RETURN(cudaStreamDestroy(plan.auxilary_calculation_stream));
+      CUDA_CHECK_RETURN(cudaStreamDestroy(plan.auxilary_copy_stream));
+    }
+  }
 }
 
-const GpuExecution &Matrix::GetCpuAdjacentInnerDataGpuPlan() {
+GpuExecution &Matrix::GetCpuAdjacentInnerDataGpuPlan() {
   return this->GetInnerDataPlanForGpuId(0);
 }
 
-const GpuExecution &Matrix::GetInnerDataPlanForGpuId(int gpu_id) {
+GpuExecution &Matrix::GetInnerDataPlanForGpuId(int gpu_id) {
   for (size_t i = 0; i < this->inner_data_execution_plans_.size(); i++) {
     if (this->inner_data_execution_plans_[i].gpu_id == gpu_id) {
-      return this->inner_data_execution_plans_[i];
+      return this->inner_data_execution_plans_.at(i);
     }
   }
 }
@@ -522,18 +547,19 @@ float Matrix::LocalSweep(Matrix new_matrix, ExecutionStats *execution_stats) {
 
   //     // move top border to the host data. Top halo of the GPU data will be
   //     skipped. Left and right halo must be skipped.
-  //     cudaMemcpyAsync(stream.h_data + stream.GetAbsoluteGpuDataWidth() + 1,
-  //                     stream.d_data + stream.GetAbsoluteGpuDataWidth() + 1,
-  //                     stream.GetGpuDataWidth() * sizeof(float),
+  //     cudaMemcpyAsync(stream.h_d_data_mirror +
+  //     stream.GetGpuDataWidth() + 1,
+  //                     stream.d_data + stream.GetGpuDataWidth() + 1,
+  //                     stream.GetGpuCalculatedRegionWidth() * sizeof(float),
   //                     cudaMemcpyDeviceToHost,
   //                     stream.stream);
 
   //     // move bottom border to the host data. Left and right halo must be
-  //     skipped. cudaMemcpyAsync(stream.h_data +
-  //     (stream.GetAbsoluteGpuDataWidth() * stream.GetGpuDataHeight()) + 1,
-  //                     stream.d_data + (stream.GetAbsoluteGpuDataWidth() *
-  //                     stream.GetGpuDataHeight()) + 1,
-  //                     stream.GetGpuDataWidth() * sizeof(float),
+  //     skipped. cudaMemcpyAsync(stream.h_d_data_mirror +
+  //     (stream.GetGpuDataWidth() * stream.GetGpuCalculatedRegionHeight()) + 1,
+  //                     stream.d_data + (stream.GetGpuDataWidth() *
+  //                     stream.GetGpuCalculatedRegionHeight()) + 1,
+  //                     stream.GetGpuCalculatedRegionWidth() * sizeof(float),
   //                     cudaMemcpyDeviceToHost,
   //                     stream.stream);
   // }
@@ -544,34 +570,32 @@ float Matrix::LocalSweep(Matrix new_matrix, ExecutionStats *execution_stats) {
   //     cudaSetDevice(stream.gpu_id);
   //     cudaStreamSynchronize(stream.stream);
   // }
-
   for (int i = 0; i < this->matrix_config_.gpu_number; i++) {
-    auto stream = this->GetInnerDataPlanForGpuId(i);
+    GpuExecution &stream = this->GetInnerDataPlanForGpuId(i);
     cudaSetDevice(stream.gpu_id);
 
     // move top halo to the gpu data
-    cudaMemcpyAsync(stream.d_data + 1, stream.h_data + 1,
-                    stream.GetGpuDataWidth() * sizeof(float),
+    cudaMemcpyAsync(stream.d_data + 1, stream.h_d_data_mirror + 1,
+                    stream.GetGpuCalculatedRegionWidth() * sizeof(float),
                     cudaMemcpyHostToDevice, stream.stream);
 
     // move bottom halo to the gpu data
-    cudaMemcpyAsync(
-        stream.d_data +
-            stream.GetAbsoluteGpuDataWidth() * (stream.GetGpuDataHeight() + 1) +
-            1,
-        stream.h_data +
-            stream.GetAbsoluteGpuDataWidth() * (stream.GetGpuDataHeight() + 1) +
-            1,
-        stream.GetGpuDataWidth() * sizeof(float), cudaMemcpyHostToDevice,
-        stream.stream);
+    cudaMemcpyAsync(stream.d_data +
+                        stream.GetGpuDataWidth() *
+                            (stream.GetGpuCalculatedRegionHeight() + 1) +
+                        1,
+                    stream.h_d_data_mirror +
+                        stream.GetGpuDataWidth() *
+                            (stream.GetGpuCalculatedRegionHeight() + 1) +
+                        1,
+                    stream.GetGpuCalculatedRegionWidth() * sizeof(float),
+                    cudaMemcpyHostToDevice, stream.stream);
   }
-
   for (int i = 0; i < this->matrix_config_.gpu_number; i++) {
-    auto stream = this->GetInnerDataPlanForGpuId(i);
+    GpuExecution &stream = this->GetInnerDataPlanForGpuId(i);
     cudaSetDevice(stream.gpu_id);
     cudaStreamSynchronize(stream.stream);
   }
-
   this->current_max_difference_ = 0;
   float diff, new_value;
 
@@ -664,10 +688,9 @@ float Matrix::LocalSweep(Matrix new_matrix, ExecutionStats *execution_stats) {
     }
   }
   execution_stats->total_border_calc_time += (MPI_Wtime() - border_start);
-
   auto inner_points_time = MPI_Wtime();
   for (int i = 0; i < this->matrix_config_.gpu_number; i++) {
-    GpuExecution execution_plan = this->GetInnerDataPlanForGpuId(i);
+    GpuExecution &execution_plan = this->GetInnerDataPlanForGpuId(i);
     if (execution_plan.GetConcurrentKernelAndCopy()) {
       this->ExecuteGpuWithConcurrentCopy(new_matrix, execution_plan);
     }
@@ -678,7 +701,8 @@ float Matrix::LocalSweep(Matrix new_matrix, ExecutionStats *execution_stats) {
   {
     int i, j;
 #pragma omp for collapse(2) private(i, j, diff, new_value)
-    for (i = 1; i < cpu_adjacent_stream.gpu_region_start; i++)
+    for (i = 1; i < cpu_adjacent_stream.GetRelativeGpuCalculationStartRow();
+         i++)
       for (j = 1; j < this->matrix_width_ - 1; j++) {
         new_value = (this->GetLocal(i - 1, j) + this->GetLocal(i + 1, j) +
                      this->GetLocal(i, j - 1) + this->GetLocal(i, j + 1)) /
@@ -696,7 +720,7 @@ float Matrix::LocalSweep(Matrix new_matrix, ExecutionStats *execution_stats) {
   auto idle_start = MPI_Wtime();
   MPI_Waitall(4, requests, MPI_STATUSES_IGNORE);
   for (int i = 0; i < this->matrix_config_.gpu_number; i++) {
-    GpuExecution execution_plan = this->GetInnerDataPlanForGpuId(i);
+    GpuExecution &execution_plan = this->GetInnerDataPlanForGpuId(i);
     CUDA_CHECK_RETURN(cudaSetDevice(execution_plan.gpu_id));
     CUDA_CHECK_RETURN(cudaStreamSynchronize(execution_plan.stream));
 
@@ -710,10 +734,10 @@ float Matrix::LocalSweep(Matrix new_matrix, ExecutionStats *execution_stats) {
 
   // consolidate reduction
   for (int i = 0; i < this->inner_data_reduction_plans_.size(); i++) {
-    if (*(this->inner_data_reduction_plans_[i].h_reduction_result) >
+    if (*(this->inner_data_reduction_plans_.at(i).h_reduction_result) >
         this->current_max_difference_)
       this->current_max_difference_ =
-          *(this->inner_data_reduction_plans_[i].h_reduction_result);
+          *(this->inner_data_reduction_plans_.at(i).h_reduction_result);
   }
 
   execution_stats->total_idle_comm_time += (MPI_Wtime() - idle_start);
@@ -722,43 +746,71 @@ float Matrix::LocalSweep(Matrix new_matrix, ExecutionStats *execution_stats) {
   return this->current_max_difference_;
 }
 
-const GpuReductionOperation &Matrix::GetInnerReductionOperation(int gpu_id) {
+GpuReductionOperation &Matrix::GetInnerReductionOperation(int gpu_id) {
   for (size_t i = 0; i < this->inner_data_reduction_plans_.size(); i++) {
     if (this->inner_data_reduction_plans_[i].gpu_id == gpu_id) {
-      return this->inner_data_reduction_plans_[i];
+      return this->inner_data_reduction_plans_.at(i);
     }
   }
 }
+void checkLastError() {
+  cudaError_t code = cudaGetLastError();
+  if (code != cudaSuccess) {
+    const char *errorMessage = cudaGetErrorString(code);
+    fprintf(stderr, "CUDA error returned Error code: %d (%s)\n", code,
+            errorMessage);
 
+    cudaDeviceReset();
+    exit(code);
+  }
+}
 void Matrix::ExecuteGpuWithConcurrentCopy(Matrix new_matrix,
-                                          GpuExecution gpu_execution_plan) {
-  auto reduction_operation =
+                                          GpuExecution &gpu_execution_plan) {
+
+  GpuReductionOperation &reduction_operation =
       this->GetInnerReductionOperation(gpu_execution_plan.gpu_id);
-  GpuExecution new_matrix_stream =
+  GpuExecution &new_matrix_stream =
       new_matrix.GetInnerDataPlanForGpuId(gpu_execution_plan.gpu_id);
 
   dim3 block_size(gpu_execution_plan.GetGpuBlockSizeX(),
                   gpu_execution_plan.GetGpuBlockSizeY());
   dim3 grid_size(gpu_execution_plan.GetGpuGridSizeX(),
-                 gpu_execution_plan.GetGpuBlockSizeY());
+                 gpu_execution_plan.GetGpuGridSizeY());
 
   CUDA_CHECK_RETURN(cudaSetDevice(gpu_execution_plan.gpu_id));
 
-  size_t shared_mem_size = gpu_execution_plan.GetAbsoluteGpuDataHeight() *
-                           gpu_execution_plan.GetAbsoluteGpuDataWidth() *
-                           sizeof(float);
+  unsigned int gpu_calc_region_width =
+      gpu_execution_plan.GetGpuCalculatedRegionWidth();
+  unsigned int gpu_calc_region_height =
+      gpu_execution_plan.GetGpuCalculatedRegionHeight();
 
-  // when this event is recorded, the difference calculation and the border
-  // transfers can start.
+  int shared_mem_calc_width = std::min(gpu_calc_region_width, block_size.x) + 2;
+  int shared_mem_calc_height =
+      std::min(gpu_calc_region_height, block_size.y) + 2;
+
+  size_t shared_mem_size =
+      shared_mem_calc_height * shared_mem_calc_width * sizeof(float);
+
+  // when this event is recorded, the difference calculation and the
+  // border transfers can start.
   cudaEvent_t kernel_computation_complete;
   CUDA_CHECK_RETURN(cudaEventCreateWithFlags(&kernel_computation_complete,
                                              cudaEventDisableTiming));
-
   LaunchJacobiKernel(gpu_execution_plan.d_data, new_matrix_stream.d_data,
                      reduction_operation.d_vector_to_reduce,
-                     gpu_execution_plan.GetGpuDataWidth(),
-                     gpu_execution_plan.GetGpuDataHeight(), block_size,
+                     gpu_execution_plan.GetGpuCalculatedRegionWidth(),
+                     gpu_execution_plan.GetGpuCalculatedRegionHeight(),
+                     shared_mem_calc_width, shared_mem_calc_height, block_size,
                      grid_size, shared_mem_size, gpu_execution_plan.stream);
+
+  // TODO (endizhupani@uni-muenster.de): remove this
+
+  // float *test = new float[reduction_operation.vector_to_reduce_length];
+  // CUDA_CHECK_RETURN(cudaMemcpyAsync(
+  //     test, reduction_operation.d_vector_to_reduce,
+  //     reduction_operation.vector_to_reduce_length * sizeof(float),
+  //     cudaMemcpyDeviceToHost, gpu_execution_plan.stream));
+  // CUDA_CHECK_RETURN(cudaStreamSynchronize(gpu_execution_plan.stream));
 
   CUDA_CHECK_RETURN(
       cudaEventRecord(kernel_computation_complete, gpu_execution_plan.stream));
@@ -772,26 +824,27 @@ void Matrix::ExecuteGpuWithConcurrentCopy(Matrix new_matrix,
       reduction_operation.h_reduction_result,
       reduction_operation.d_reduction_result, sizeof(float),
       cudaMemcpyDeviceToHost, gpu_execution_plan.auxilary_calculation_stream));
-  int transfer_start_idx = gpu_execution_plan.GetAbsoluteGpuDataWidth() + 1;
+  int transfer_start_idx = gpu_execution_plan.GetGpuDataWidth() + 1;
 
-  // move top border to the host data. Top halo of the GPU data will be skipped.
-  // Left and right halo must be skipped.
-  CUDA_CHECK_RETURN(
-      cudaMemcpyAsync(gpu_execution_plan.h_data + transfer_start_idx,
-                      gpu_execution_plan.d_data + transfer_start_idx,
-                      gpu_execution_plan.GetGpuDataWidth() * sizeof(float),
-                      cudaMemcpyDeviceToHost, gpu_execution_plan.stream));
+  // move top border to the host data. Top halo of the GPU data will be
+  // skipped. Left and right halo must be skipped.
+  CUDA_CHECK_RETURN(cudaMemcpyAsync(
+      new_matrix_stream.h_d_data_mirror + transfer_start_idx,
+      new_matrix_stream.d_data + transfer_start_idx,
+      new_matrix_stream.GetGpuCalculatedRegionWidth() * sizeof(float),
+      cudaMemcpyDeviceToHost, gpu_execution_plan.stream));
 
-  // move bottom border to the host data. Left and right halo must be skipped.
+  // move bottom border to the host data. Left and right halo must be
+  // skipped.
   CUDA_CHECK_RETURN(cudaStreamWaitEvent(gpu_execution_plan.auxilary_copy_stream,
                                         kernel_computation_complete, 0));
-  transfer_start_idx = (gpu_execution_plan.GetAbsoluteGpuDataWidth() *
-                        gpu_execution_plan.GetGpuDataHeight()) +
+  transfer_start_idx = (gpu_execution_plan.GetGpuDataWidth() *
+                        gpu_execution_plan.GetGpuCalculatedRegionHeight()) +
                        1;
   CUDA_CHECK_RETURN(cudaMemcpyAsync(
-      gpu_execution_plan.h_data + transfer_start_idx,
-      gpu_execution_plan.d_data + transfer_start_idx,
-      gpu_execution_plan.GetGpuDataWidth() * sizeof(float),
+      new_matrix_stream.h_d_data_mirror + transfer_start_idx,
+      new_matrix_stream.d_data + transfer_start_idx,
+      new_matrix_stream.GetGpuCalculatedRegionWidth() * sizeof(float),
       cudaMemcpyDeviceToHost, gpu_execution_plan.auxilary_copy_stream));
 }
 
@@ -864,7 +917,37 @@ const float Matrix::GlobalDifference(ExecutionStats *execution_stats) {
   return current_max_difference_;
 }
 
+void Matrix::AssemblePartition() {
+  for (int i = 0; i < this->matrix_config_.gpu_number; i++) {
+    GpuExecution &plan = this->GetInnerDataPlanForGpuId(i);
+    CUDA_CHECK_RETURN(cudaSetDevice(plan.gpu_id));
+    CUDA_CHECK_RETURN(cudaMemcpyAsync(
+        plan.h_d_data_mirror + plan.GetGpuDataWidth(),
+        plan.d_data + plan.GetGpuDataWidth(),
+        (plan.GetGpuDataWidth()) * (plan.GetGpuCalculatedRegionHeight()) *
+            sizeof(float),
+        cudaMemcpyDeviceToHost, plan.stream));
+  }
+
+  for (int i = 0; i < this->matrix_config_.gpu_number; i++) {
+    GpuExecution &plan = this->GetInnerDataPlanForGpuId(i);
+    CUDA_CHECK_RETURN(cudaSetDevice(plan.gpu_id));
+    CUDA_CHECK_RETURN(cudaStreamSynchronize(plan.stream));
+  }
+}
+
+void Matrix::PrintInnerData() {
+  printf("\n\n");
+  for (int i = 0; i < this->partition_height_ + 2; i++) {
+    for (int j = 0; j < this->matrix_width_; j++) {
+      printf("%6.2f ", inner_points_[i * this->matrix_width_ + j]);
+    }
+    putchar('\n');
+  }
+}
+
 void Matrix::ShowMatrix() {
+  this->AssemblePartition();
   float *partition_data = inner_points_; // this->AssemblePartition();
   float *matrix;
   if (this->proc_id_ == 0) {

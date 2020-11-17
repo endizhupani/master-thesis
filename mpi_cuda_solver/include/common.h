@@ -126,7 +126,7 @@ private:
   int gpu_grid_size_y = 0;
   int gpu_data_width = 0;
   int gpu_data_height = 0;
-
+  int gpu_region_start;
   bool concurrentKernelCopy;
 
   /**
@@ -135,21 +135,22 @@ private:
    *
    */
   void AdjustGridAndBlockSizes() {
-    if (gpu_data_height % DEFAULT_BLOCK_DIM > ((double)DEFAULT_BLOCK_DIM / 2)) {
+    if (gpu_data_height % DEFAULT_BLOCK_DIM >=
+        ((double)DEFAULT_BLOCK_DIM / 2)) {
       gpu_block_size_y = DEFAULT_BLOCK_DIM / 2;
     } else {
       gpu_block_size_y = DEFAULT_BLOCK_DIM;
     }
 
-    gpu_grid_size_y = ceil(gpu_block_size_y / GetGpuBlockSizeY());
+    gpu_grid_size_y = ceil((double)gpu_data_height / GetGpuBlockSizeY());
 
-    if (gpu_data_width % DEFAULT_BLOCK_DIM > ((double)DEFAULT_BLOCK_DIM / 2)) {
+    if (gpu_data_width % DEFAULT_BLOCK_DIM >= ((double)DEFAULT_BLOCK_DIM / 2)) {
       gpu_block_size_x = DEFAULT_BLOCK_DIM / 2;
     } else {
       gpu_block_size_x = DEFAULT_BLOCK_DIM;
     }
 
-    gpu_grid_size_x = ceil(gpu_block_size_x / GetGpuBlockSizeX());
+    gpu_grid_size_x = ceil((double)gpu_data_width / GetGpuBlockSizeX());
   }
 
 public:
@@ -162,16 +163,51 @@ public:
   cudaStream_t auxilary_calculation_stream;
 
   float *d_data;
-  float *h_data;
+
+  // A pointer to the first element from the host data that is also copied to
+  // the device.
+  float *h_d_data_mirror;
 
   int halo_points_host_start;
 
-  // this is the row index where the gpu data starts. Note that in the
-  // calculation of this index, the top and bottom halos of the partition and
-  // top and bottom halos of the GPU data are calculated.
-  int gpu_region_start;
-
   bool is_contiguous_on_host;
+
+  /**
+   * @brief Sets the row of the full partition data object (including the top
+   * and bottom halos of the partition data) where the GPU calculation starts
+   *
+   * @param value
+   */
+  void SetGpuCalculationStartRow(int value) { gpu_region_start = value; }
+
+  /**
+   * @brief Gets the first row of the region that is calculated by the GPU.
+   * Skips any halo rows that might be in the GPU data. The row index is on the
+   * full partition data with 0 being the first halo row
+   *
+   * @return const int
+   */
+  const int GetAbsoluteGpuCalculationStartRow() { return gpu_region_start; }
+
+  /**
+   * @brief Gets the first row of the region that is calculated by the GPU.
+   * Skips any halo rows that might be in the GPU data. The row index is on the
+   * partition data with 0 being the first row of the partition. The halo rows
+   * are skipped
+   *
+   * @return const int
+   */
+  const int GetRelativeGpuCalculationStartRow() { return gpu_region_start - 1; }
+
+  /**
+   * @brief returns the value of the first row that should be copied to the GPU.
+   * This includes any halo rows that will not be calculated, but are needed for
+   * the calculation of other points in the matrix. The row index is on the
+   * full partition data with 0 being the first halo row
+   *
+   * @return const int
+   */
+  const int GetGpuDataStartRow() { return gpu_region_start - 1; }
 
   void SetDeviceProperties(cudaDeviceProp deviceProp) {
     concurrentKernelCopy = deviceProp.deviceOverlap;
@@ -207,13 +243,37 @@ public:
     AdjustGridAndBlockSizes();
   }
 
-  int GetGpuDataHeight() { return gpu_data_height; }
+  /**
+   * @brief Returns the height of the region that is calculated by the GPU. This
+   * is the height of the data stored in the GPU minus the top and bottom GPU
+   * halos
+   *
+   * @return int
+   */
+  int GetGpuCalculatedRegionHeight() { return gpu_data_height; }
 
-  int GetAbsoluteGpuDataHeight() { return gpu_data_height + 2; }
+  /**
+   * @brief Returns the full height of the data section residing on the GPU
+   *
+   * @return int
+   */
+  int GetGpuDataHeight() { return gpu_data_height + 2; }
 
-  int GetGpuDataWidth() { return gpu_data_width; }
+  /**
+   * @brief Returns the width of the region that is calculated by the GPU. This
+   * is the width of the data stored in the GPU minus the left and right columns
+   * which are the left and right borders that are not calculated by the GPU
+   *
+   * @return int
+   */
+  int GetGpuCalculatedRegionWidth() { return gpu_data_width; }
 
-  int GetAbsoluteGpuDataWidth() { return gpu_data_width + 2; }
+  /**
+   * @brief Returnds the full width of the data stored in the GPU.
+   *
+   * @return int
+   */
+  int GetGpuDataWidth() { return gpu_data_width + 2; }
 
   int GetGpuBlockSizeY() { return gpu_block_size_y; }
 

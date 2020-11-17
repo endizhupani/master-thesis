@@ -106,6 +106,8 @@ private:
   float initial_top_value_;
   float initial_bottom_value_;
 
+  float *full_matrix_;
+
 #pragma endregion
 
 #pragma region Calculation management
@@ -209,10 +211,14 @@ private:
    * execution.
    */
   void ExecuteGpuWithConcurrentCopy(Matrix new_matrix,
-                                    GpuExecution gpu_execution_plan);
+                                    GpuExecution &gpu_execution_plan);
+
+  void PrintInnerData();
 
 public:
   void Deallocate();
+
+  void AssemblePartition();
 
   /**
    * @brief Gets the gpu execution plan for the part of the inner data of the
@@ -220,7 +226,7 @@ public:
    *
    * @return const GpuExecution&
    */
-  const GpuExecution &GetCpuAdjacentInnerDataGpuPlan();
+  GpuExecution &GetCpuAdjacentInnerDataGpuPlan();
 
   /**
    * @brief Gets the inner data calculation gpu execution plan for the specified
@@ -229,7 +235,7 @@ public:
    * @param gpu_id
    * @return const GpuExecution&
    */
-  const GpuExecution &GetInnerDataPlanForGpuId(int gpu_id);
+  GpuExecution &GetInnerDataPlanForGpuId(int gpu_id);
 
   /**
    * @brief Gets the reduction operation details for the specified gpu id
@@ -237,7 +243,7 @@ public:
    * @param gpu_id
    * @return const GpuReductionOperation&
    */
-  const GpuReductionOperation &GetInnerReductionOperation(int gpu_id);
+  GpuReductionOperation &GetInnerReductionOperation(int gpu_id);
   const GpuExecution GetLeftBorderStream();
   const GpuExecution GetRightBorderStream();
 
@@ -353,13 +359,6 @@ public:
   void Synchronize();
 
   Matrix CloneShell();
-
-  /**
-   * @brief Puts together the data in the partition
-   *
-   * @return float*
-   */
-  float *AssemblePartition();
 
   /**
    * @brief Checks if the partition is a partition that contains the top border
