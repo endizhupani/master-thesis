@@ -291,6 +291,9 @@ public:
   double total_idle_comm_time;
   double total_sweep_time;
   double total_time_reducing_difference;
+  double total_time_waiting_to_host_transfer;
+  double total_time_waiting_to_device_transfer;
+  double last_global_difference;
   int n_diff_reducions;
   int n_sweeps;
 
@@ -307,20 +310,29 @@ public:
         Total time executing inner point calculations: %f\n\
         Total time waiting for communication to finish: %f\n\
         Total time reducing and exchanging the global difference: %f\n\
+        Total time waiting for data to be transferred to host: %f\n\
+        Total time waiting for data to be transferred to device: %f\n\
         Avg time spent executing Jacobi Iterations: %f\n\
         Avg time executing border point calculations: %f\n\
         Avg time executing inner point calculations: %f\n\
         Avg time waiting for communication to finish: %f\n\
         Avg time reducing and exchanging the global difference: %f\n\
+        Avg time waiting for data to be transferred to host: %f\n\
+        Avg time waiting for data to be transferred to device: %f\n\
         Number of iterations: %d\n\
-        Number of difference reductions: %d\n",
+        Number of difference reductions: %d\n\
+        Last difference: %f\n",
            total_sweep_time, total_border_calc_time, total_inner_points_time,
            total_idle_comm_time, total_time_reducing_difference,
-           (total_sweep_time / n_sweeps), (total_border_calc_time / n_sweeps),
+           total_time_waiting_to_host_transfer,
+           total_time_waiting_to_device_transfer, (total_sweep_time / n_sweeps),
+           (total_border_calc_time / n_sweeps),
            (total_inner_points_time / n_sweeps),
            (total_idle_comm_time / n_sweeps),
-           (total_time_reducing_difference / n_diff_reducions), n_sweeps,
-           n_diff_reducions);
+           (total_time_reducing_difference / n_diff_reducions),
+           (total_time_waiting_to_host_transfer / n_sweeps),
+           (total_time_waiting_to_device_transfer / n_sweeps), n_sweeps,
+           n_diff_reducions, last_global_difference);
   }
 
   void print_to_file(char *file_path) {}

@@ -27,7 +27,8 @@ __global__ void jacobiKernel(float *in, float *out, float *diff,
   if (local_y == 1) {
     shared[(local_y - 1) * (smem_width) + local_x] =
         in[(y - 1) * absolute_gpu_data_width + x];
-  } else if (local_y == (smem_height - 2)) {
+  } else if (local_y == (smem_height - 2) ||
+             y == (absolute_gpu_data_height - 2)) {
     shared[(local_y + 1) * (smem_width) + local_x] =
         in[(y + 1) * absolute_gpu_data_width + x];
   }
@@ -35,7 +36,8 @@ __global__ void jacobiKernel(float *in, float *out, float *diff,
   if (local_x == 1) {
     shared[(local_y) * (smem_width) + local_x - 1] =
         in[y * absolute_gpu_data_width + x - 1];
-  } else if (local_x == (smem_width - 2)) {
+  } else if (local_x == (smem_width - 2) ||
+             x == (absolute_gpu_data_width - 2)) {
     shared[local_y * (smem_width) + local_x + 1] =
         in[y * absolute_gpu_data_width + x + 1];
   }
@@ -55,14 +57,14 @@ __global__ void jacobiKernel(float *in, float *out, float *diff,
   // printf(
   //     "\n\nLocal Thread idx: x:%d y:%d\nGlobal Thread Idx: x:%d "
   //     "y:%d\nCalculating point (%d,%d)\nShared memory number items: %d\n "
-  //     "Value is:%f\nCurrentDifference is: %f\nValues used are: %f, %f, %f,
-  //     %f", threadIdx.x, threadIdx.y, (blockIdx.x * blockDim.x + threadIdx.x),
-  //     (blockIdx.y * blockDim.y + threadIdx.y), x, y, smem_width *
-  //     smem_height, val, current_diff, shared[(local_y - 1) * (smem_width) +
+  //     "Value is:%f\nCurrentDifference is: %f\nValues used are: %f, %f,
+  //     %f,%f", threadIdx.x, threadIdx.y, (blockIdx.x * blockDim.x +
+  //     threadIdx.x), (blockIdx.y * blockDim.y + threadIdx.y), x, y, smem_width
+  //     * smem_height, val, current_diff, shared[(local_y - 1) * (smem_width) +
   //     local_x], shared[(local_y + 1) * (smem_width) + local_x],
   //     shared[(local_y) * (smem_width) + local_x + 1],
   //     shared[(local_y) * (smem_width) + local_x - 1]);
-  diff[y * absolute_gpu_data_width + x] = current_diff;
+  diff[(y - 1) * gpu_data_width + (x - 1)] = current_diff;
   out[y * absolute_gpu_data_width + x] = val;
 }
 

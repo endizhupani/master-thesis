@@ -10,7 +10,7 @@
 using namespace std;
 #define EPSILON 0.01
 #define N_THREADS 8
-#define MAX_ITER 10000
+#define MAX_ITER 5000
 
 int getChunkSize(int arrayCount, int numElPerLine);
 
@@ -24,7 +24,7 @@ int main(int argc,
 #endif // __CUDACC__
   MatrixConfiguration conf;
   if (argc <= 2) {
-    conf = {deviceCount, 10, 10, 0.25};
+    conf = {deviceCount, 100, 100, 0.25};
   } else {
     conf = {deviceCount, atoi(argv[1]), atoi(argv[1]), atof(argv[2])};
   }
@@ -33,10 +33,11 @@ int main(int argc,
   pde_solver::Matrix new_m = m.CloneShell();
   int num_iter = 0;
   float global_diff = 10;
-  ExecutionStats stats = {0.0, 0.0, 0.0, 0.0, 0.0, 0, 0};
+  ExecutionStats stats = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0, 0};
   // m.ShowMatrix();
   // double tot_loop_time = 0;
   // double calc_start = MPI_Wtime();
+  printf("Starting Jacobi Calculation\n");
   while (global_diff > EPSILON && num_iter < MAX_ITER) {
 
     // double t = MPI_Wtime();
@@ -51,6 +52,7 @@ int main(int argc,
     new_m = tmp;
     num_iter++;
   }
+
   // m.ShowMatrix();
   stats.print_to_console();
 
@@ -61,7 +63,7 @@ int main(int argc,
 
   // m.Synchronize();
   // m.PrintAllPartitions();
-  // m.ShowMatrix();
+  //
   printf("\nFinished the computation. Deallocating...\n");
   new_m.Deallocate();
 

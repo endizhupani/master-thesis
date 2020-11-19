@@ -496,17 +496,17 @@ void Matrix::Finalize() {
            result);
   }
 
-  for (size_t i = 0; i < 2; i++) {
-    CUDA_CHECK_RETURN(cudaSetDevice(this->border_execution_plans_[i].gpu_id));
-    CUDA_CHECK_RETURN(
-        cudaStreamDestroy(this->border_execution_plans_[i].stream));
-    if (this->border_execution_plans_[i].GetConcurrentKernelAndCopy()) {
-      CUDA_CHECK_RETURN(cudaStreamDestroy(
-          this->border_execution_plans_[i].auxilary_calculation_stream));
-      CUDA_CHECK_RETURN(cudaStreamDestroy(
-          this->border_execution_plans_[i].auxilary_copy_stream));
-    }
-  }
+  // for (size_t i = 0; i < 2; i++) {
+  //   CUDA_CHECK_RETURN(cudaSetDevice(this->border_execution_plans_[i].gpu_id));
+  //   CUDA_CHECK_RETURN(
+  //       cudaStreamDestroy(this->border_execution_plans_[i].stream));
+  //   if (this->border_execution_plans_[i].GetConcurrentKernelAndCopy()) {
+  //     CUDA_CHECK_RETURN(cudaStreamDestroy(
+  //         this->border_execution_plans_[i].auxilary_calculation_stream));
+  //     CUDA_CHECK_RETURN(cudaStreamDestroy(
+  //         this->border_execution_plans_[i].auxilary_copy_stream));
+  //   }
+  // }
 
   for (size_t i = 0; i < this->inner_data_execution_plans_.size(); i++) {
     GpuExecution &plan = this->GetInnerDataPlanForGpuId(i);
@@ -537,6 +537,20 @@ const GpuExecution Matrix::GetRightBorderStream() {
 
 const GpuExecution Matrix::GetLeftBorderStream() {
   return this->border_execution_plans_[0];
+}
+
+void PrintVectortoReduce(int height, int width, GpuReductionOperation op) {
+  float *h_data = new float[height * width];
+  cudaMemcpy(h_data, op.d_vector_to_reduce, height * width * sizeof(float),
+             cudaMemcpyDeviceToHost);
+  for (int i = 0; i < height; i++) {
+    for (int j = 0; j < width; j++) {
+      printf("%6.2f ", h_data[i * width + j]);
+    }
+    putchar('\n');
+  }
+
+  delete[] h_data;
 }
 
 float Matrix::LocalSweep(Matrix new_matrix, ExecutionStats *execution_stats) {
@@ -570,6 +584,7 @@ float Matrix::LocalSweep(Matrix new_matrix, ExecutionStats *execution_stats) {
   //     cudaSetDevice(stream.gpu_id);
   //     cudaStreamSynchronize(stream.stream);
   // }
+  auto time_to_device = MPI_Wtime();
   for (int i = 0; i < this->matrix_config_.gpu_number; i++) {
     GpuExecution &stream = this->GetInnerDataPlanForGpuId(i);
     cudaSetDevice(stream.gpu_id);
@@ -596,6 +611,8 @@ float Matrix::LocalSweep(Matrix new_matrix, ExecutionStats *execution_stats) {
     cudaSetDevice(stream.gpu_id);
     cudaStreamSynchronize(stream.stream);
   }
+  execution_stats->total_time_waiting_to_device_transfer +=
+      (MPI_Wtime() - time_to_device);
   this->current_max_difference_ = 0;
   float diff, new_value;
 
@@ -719,6 +736,9 @@ float Matrix::LocalSweep(Matrix new_matrix, ExecutionStats *execution_stats) {
 
   auto idle_start = MPI_Wtime();
   MPI_Waitall(4, requests, MPI_STATUSES_IGNORE);
+  execution_stats->total_idle_comm_time += (MPI_Wtime() - idle_start);
+
+  auto transfer_to_host_start = MPI_Wtime();
   for (int i = 0; i < this->matrix_config_.gpu_number; i++) {
     GpuExecution &execution_plan = this->GetInnerDataPlanForGpuId(i);
     CUDA_CHECK_RETURN(cudaSetDevice(execution_plan.gpu_id));
@@ -731,16 +751,19 @@ float Matrix::LocalSweep(Matrix new_matrix, ExecutionStats *execution_stats) {
           cudaStreamSynchronize(execution_plan.auxilary_copy_stream));
     }
   }
+  execution_stats->total_time_waiting_to_host_transfer +=
+      (MPI_Wtime() - transfer_to_host_start);
 
   // consolidate reduction
   for (int i = 0; i < this->inner_data_reduction_plans_.size(); i++) {
-    if (*(this->inner_data_reduction_plans_.at(i).h_reduction_result) >
-        this->current_max_difference_)
-      this->current_max_difference_ =
-          *(this->inner_data_reduction_plans_.at(i).h_reduction_result);
-  }
 
-  execution_stats->total_idle_comm_time += (MPI_Wtime() - idle_start);
+    GpuReductionOperation &reduction_operation =
+        this->GetInnerReductionOperation(i);
+    if (reduction_operation.h_reduction_result[0] >
+        this->current_max_difference_) {
+      this->current_max_difference_ = reduction_operation.h_reduction_result[0];
+    }
+  }
   execution_stats->total_sweep_time += (MPI_Wtime() - sweep_start);
   execution_stats->n_sweeps += 1;
   return this->current_max_difference_;
@@ -777,6 +800,30 @@ void Matrix::ExecuteGpuWithConcurrentCopy(Matrix new_matrix,
   dim3 grid_size(gpu_execution_plan.GetGpuGridSizeX(),
                  gpu_execution_plan.GetGpuGridSizeY());
 
+  float *t = new float[gpu_execution_plan.GetGpuDataHeight() *
+                       gpu_execution_plan.GetGpuDataWidth()];
+  // cudaMemcpy(t, gpu_execution_plan.d_data,
+  //            gpu_execution_plan.GetGpuDataHeight() *
+  //                gpu_execution_plan.GetGpuDataWidth() * sizeof(float),
+  //            cudaMemcpyDeviceToHost);
+  // for (int i = 0; i < gpu_execution_plan.GetGpuDataHeight(); i++) {
+  //   for (int j = 0; j < gpu_execution_plan.GetGpuDataWidth(); j++) {
+  //     printf("%6.2f ", t[i * gpu_execution_plan.GetGpuDataWidth() + j]);
+  //   }
+  //   putchar('\n');
+  // }
+
+  // delete[] t;
+
+  // printf("Block size: %dx%d\nGrid Size:%dx%d\n\n", block_size.x,
+  // block_size.y,
+  //        grid_size.x, grid_size.y);
+
+  // printf("gpu calculated data: %dx%d\n",
+  //        gpu_execution_plan.GetGpuCalculatedRegionHeight(),
+  //        gpu_execution_plan.GetGpuCalculatedRegionWidth(), grid_size.x,
+  //        grid_size.y);
+
   CUDA_CHECK_RETURN(cudaSetDevice(gpu_execution_plan.gpu_id));
 
   unsigned int gpu_calc_region_width =
@@ -802,15 +849,6 @@ void Matrix::ExecuteGpuWithConcurrentCopy(Matrix new_matrix,
                      gpu_execution_plan.GetGpuCalculatedRegionHeight(),
                      shared_mem_calc_width, shared_mem_calc_height, block_size,
                      grid_size, shared_mem_size, gpu_execution_plan.stream);
-
-  // TODO (endizhupani@uni-muenster.de): remove this
-
-  // float *test = new float[reduction_operation.vector_to_reduce_length];
-  // CUDA_CHECK_RETURN(cudaMemcpyAsync(
-  //     test, reduction_operation.d_vector_to_reduce,
-  //     reduction_operation.vector_to_reduce_length * sizeof(float),
-  //     cudaMemcpyDeviceToHost, gpu_execution_plan.stream));
-  // CUDA_CHECK_RETURN(cudaStreamSynchronize(gpu_execution_plan.stream));
 
   CUDA_CHECK_RETURN(
       cudaEventRecord(kernel_computation_complete, gpu_execution_plan.stream));
@@ -914,6 +952,7 @@ const float Matrix::GlobalDifference(ExecutionStats *execution_stats) {
   execution_stats->total_time_reducing_difference +=
       (MPI_Wtime() - reduction_start);
   execution_stats->n_diff_reducions += 1;
+  execution_stats->last_global_difference = current_max_difference_;
   return current_max_difference_;
 }
 
@@ -959,6 +998,7 @@ void Matrix::ShowMatrix() {
              this->partition_height_ * this->matrix_width_, MPI_DOUBLE, matrix,
              this->partition_height_ * this->matrix_width_, MPI_DOUBLE, 0,
              this->GetCartesianCommunicator());
+  printf("\n");
   for (int i = 0; i < this->matrix_height_; i++) {
     for (int j = 0; j < this->matrix_width_; j++) {
       printf("%6.2f ", matrix[i * this->matrix_width_ + j]);
