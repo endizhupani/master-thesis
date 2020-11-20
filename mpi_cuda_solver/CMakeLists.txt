@@ -99,7 +99,7 @@ add_executable(${executable_name} ${executable} ${SOURCES} ${CUDA_SOURCES})
 
 target_compile_features(${executable_name} PUBLIC cxx_std_14)
 target_include_directories(${executable_name} 
-  PUBLIC ${MPI_CXX_INCLUDE_DIRS} ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES} ${PROJECT_SOURCE_DIR}/src ${PROJECT_SOURCE_DIR}/src/cache
+  PUBLIC ${MPI_CXX_INCLUDE_DIRS} ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES} ${PROJECT_SOURCE_DIR}/lib/cub-1.8.0 ${PROJECT_SOURCE_DIR}/src ${PROJECT_SOURCE_DIR}/src/cache
   PUBLIC ${PROJECT_SOURCE_DIR}/include)
 target_compile_definitions(${executable_name} PUBLIC ${MPI_CXX_COMPILE_DEFINITIONS})
 target_compile_options(${executable_name} PUBLIC )

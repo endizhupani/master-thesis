@@ -1,6 +1,6 @@
 #include "kernels.cuh"
 
-#include <cub/device/device_reduce.cuh>
+#include <cub/cub.cuh>
 //#include <cub/util_allocator.cuh>
 
 __global__ void jacobiKernel(float *in, float *out, float *diff,

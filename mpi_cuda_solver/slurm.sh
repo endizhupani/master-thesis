@@ -14,12 +14,9 @@
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=endizhupani@uni-muenster.de
 
-module load intelcuda/2019a
-module load CMake/3.15.3
-
 cd /home/e/e_zhup01/mpi_cuda_solver
 
-./build-release.sh
+./load-module-build.sh
 export OMP_NUM_THREADS=4
 
 # vorläufig, bis MPI über Infiniband funktioniert
@@ -28,4 +25,4 @@ export I_MPI_DEBUG=3
 # alternativ: Ethernet statt Infiniband:
 export I_MPI_FABRICS=shm:tcp
 
-mpirun /home/e/e_zhup01/mpi_cuda_solver/build/mpi_cuda_solver.exe 1200 0.5
+srun /home/e/e_zhup01/mpi_cuda_solver/build/mpi_cuda_solver.exe 1200 0.5
