@@ -142,11 +142,17 @@ void Matrix::InitData(float inner_value, float left_border_value,
       this->SetLocal(value, i, j);
     }
   }
+
+  // printf("Total number of GPUs: %d\n", this->matrix_config_.gpu_number);
   // Move data to GPU
   for (int i = 0; i < this->matrix_config_.gpu_number; i++) {
     // Assign the pointer to the copy of gpu data on the host. gpu_region_start
     // - 1 rows must be skipped.
+    // printf("GPU number %d\n", i);
     GpuExecution &plan = this->GetInnerDataPlanForGpuId(i);
+
+    // printf("Plan retrieved\nStart row: %d\nGpu Data width: %d\n",
+    //        plan.GetGpuDataStartRow(), plan.GetGpuDataWidth());
     plan.h_d_data_mirror = &(this->inner_points_[(plan.GetGpuDataStartRow()) *
                                                  (plan.GetGpuDataWidth())]);
     CUDA_CHECK_RETURN(cudaSetDevice(plan.gpu_id));
@@ -260,8 +266,6 @@ void Matrix::ConfigGpuExecution() {
     }
   }
 
-  //   this->inner_data_execution_plans_ =
-  //       new GpuExecution[this->matrix_config_.gpu_number];
   // configure inner data streams
   for (int i = 0; i < this->matrix_config_.gpu_number; i++) {
     GpuExecution plan;
@@ -300,10 +304,10 @@ void Matrix::Deallocate() {
         cudaFree(this->inner_data_reduction_plans_[i].d_tmp_data));
     CUDA_CHECK_RETURN(
         cudaFree(this->inner_data_reduction_plans_[i].d_vector_to_reduce));
-  }
 
-  // TODO (endizhupani@uni-muenster.de): Add code to deallocate the rest of the
-  // data.
+    CUDA_CHECK_RETURN(
+        cudaFreeHost(this->inner_data_reduction_plans_[i].h_reduction_result));
+  }
 }
 
 void Matrix::AllocateMemory() {
@@ -332,13 +336,20 @@ void Matrix::AllocateMemory() {
   this->bottom_halo_ =
       &this->inner_points_[(inner_data_rows - 1) * this->matrix_width_];
 
+  // printf("Allocating GPU data...\n~Rows per GPU:%d\nTotal rows to be
+  // processed "
+  //        "on the GPU:%d\n",
+  //        rows_per_gpu, total_gpu_rows);
   for (int i = 0; i < this->matrix_config_.gpu_number; i++) {
     GpuExecution &gpu_execution_plan = this->GetInnerDataPlanForGpuId(i);
 
     // last device should get the remainer of the rows.
-    rows_to_allocate = (i = this->matrix_config_.gpu_number - 1)
+    rows_to_allocate = (i == this->matrix_config_.gpu_number - 1)
                            ? (total_gpu_rows - rows_allocated)
                            : rows_per_gpu;
+
+    // printf("Allocating rows on GPU %d. Rows to allocate: %d\n",
+    //        gpu_execution_plan.gpu_id, rows_to_allocate);
     // left and right border are excluded.
     gpu_execution_plan.SetGpuDataWidth(this->matrix_width_ - 2);
     gpu_execution_plan.SetGpuDataHeight(rows_per_gpu);
@@ -373,7 +384,10 @@ void Matrix::AllocateMemory() {
         inner_rows + inner_rows_start_row_idx -
         (total_gpu_rows - rows_allocated));
     rows_allocated += rows_per_gpu;
-    gpu_execution_plan.is_contiguous_on_host = true;
+
+    // printf("Allocated rows on GPU %d. Total allocated rows: %d\n",
+    //        gpu_execution_plan.gpu_id, rows_allocated);
+    // gpu_execution_plan.is_contiguous_on_host = true;
   }
 
   // TODO (endizhupani@uni-muenster.de): Enable after the inner data calculation
@@ -458,7 +472,7 @@ void Matrix::InitializeMPI(int argc, char *argv[]) {
     // TODO(endizhupani@uni-muenster.de): Replace this with a custom exception
     throw new std::logic_error("The MPI context is already initialized");
   }
-  MPI_Init(&argc, &argv);
+
   MPI_Comm_size(MPI_COMM_WORLD, &proc_count_);
   int n_dim = 2;
   int periods[2] = {0, 0};
@@ -488,13 +502,8 @@ void Matrix::InitializeMPI(int argc, char *argv[]) {
 }
 
 void Matrix::Finalize() {
-  Deallocate();
   MPI_Barrier(this->GetCartesianCommunicator());
-  int result = MPI_Finalize();
-  if (this->proc_id_ == 0) {
-    printf("MPi Finalize, process %d, return code: %d\n", this->proc_id_,
-           result);
-  }
+  Deallocate();
 
   // for (size_t i = 0; i < 2; i++) {
   //   CUDA_CHECK_RETURN(cudaSetDevice(this->border_execution_plans_[i].gpu_id));
@@ -517,6 +526,13 @@ void Matrix::Finalize() {
       CUDA_CHECK_RETURN(cudaStreamDestroy(plan.auxilary_copy_stream));
     }
   }
+}
+
+void Matrix::FinalizeMpi() {
+  MPI_Barrier(this->GetCartesianCommunicator());
+  MPI_Comm *handle;
+  handle = &cartesian_communicator_;
+  MPI_Comm_free(handle);
 }
 
 GpuExecution &Matrix::GetCpuAdjacentInnerDataGpuPlan() {

@@ -217,8 +217,10 @@ private:
 
 public:
   void Deallocate();
-
+  void FinalizeMpi();
   void AssemblePartition();
+
+  void WriteStatsToFile(char *file_path, bool print_header);
 
   /**
    * @brief Gets the gpu execution plan for the part of the inner data of the

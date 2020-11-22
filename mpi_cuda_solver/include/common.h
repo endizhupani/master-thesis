@@ -23,9 +23,11 @@
  * SOFTWARE.
  */
 //#include "cuda.h"
-#include "cuda_runtime.h"
 #include "math.h"
 #include "mpi.h"
+#include <cuda.h>
+#include <cuda_runtime.h>
+#include <fstream>
 #include <iostream>
 #include <string>
 
@@ -45,6 +47,11 @@
       exit(EXIT_FAILURE);                                                      \
     }                                                                          \
   }
+
+void InitMPIContext(int argc, char *argv[]);
+void FinalizeMPIContext();
+int GetProcessId();
+int End(int error_code);
 
 /**
  * @brief The type of the partition neighbour
@@ -335,7 +342,29 @@ public:
            n_diff_reducions, last_global_difference);
   }
 
-  void print_to_file(char *file_path) {}
+  void PrintHeaderToFile(char *file_path) {
+    std::ofstream outputFile;
+    outputFile.open(file_path, std::ios_base::app);
+    outputFile
+        << "total_border_calc_time,total_inner_points_time,total_idle_comm_"
+           "time,total_sweep_time,total_time_reducing_difference,total_time_"
+           "waiting_to_host_transfer,total_time_waiting_to_device_transfer,"
+           "last_global_difference,n_diff_reducions,n_sweeps\n";
+    outputFile.close();
+  }
+
+  void PrintToFile(char *file_path) {
+    std::ofstream outputFile;
+    outputFile.open(file_path, std::ios_base::app);
+    outputFile << total_border_calc_time << "," << total_inner_points_time
+               << "," << total_idle_comm_time << "," << total_sweep_time << ","
+               << total_time_reducing_difference << ","
+               << total_time_waiting_to_host_transfer << ","
+               << total_time_waiting_to_device_transfer << ","
+               << last_global_difference << "," << n_diff_reducions << ","
+               << n_sweeps << "\n";
+    outputFile.close();
+  }
 };
 
 #endif // !COMMON_H
