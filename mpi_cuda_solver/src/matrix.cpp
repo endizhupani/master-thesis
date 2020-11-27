@@ -627,6 +627,7 @@ float Matrix::LocalSweep(Matrix new_matrix, ExecutionStats *execution_stats) {
     cudaSetDevice(stream.gpu_id);
     cudaStreamSynchronize(stream.stream);
   }
+
   execution_stats->total_time_waiting_to_device_transfer +=
       (MPI_Wtime() - time_to_device);
   this->current_max_difference_ = 0;
@@ -720,6 +721,7 @@ float Matrix::LocalSweep(Matrix new_matrix, ExecutionStats *execution_stats) {
       }
     }
   }
+
   execution_stats->total_border_calc_time += (MPI_Wtime() - border_start);
   auto inner_points_time = MPI_Wtime();
   for (int i = 0; i < this->matrix_config_.gpu_number; i++) {
@@ -728,7 +730,6 @@ float Matrix::LocalSweep(Matrix new_matrix, ExecutionStats *execution_stats) {
       this->ExecuteGpuWithConcurrentCopy(new_matrix, execution_plan);
     }
   }
-
   auto cpu_adjacent_stream = this->GetCpuAdjacentInnerDataGpuPlan();
 #pragma omp parallel reduction(max : current_max_difference_)
   {

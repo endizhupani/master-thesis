@@ -47,6 +47,7 @@ int run(int run_number, int argc, char *argv[]) {
 
     // double t = MPI_Wtime();
     m.LocalSweep(new_m, &stats);
+    // printf("Sweeped");
     // tot_loop_time += (MPI_Wtime() - t);
     if (num_iter % 4 == 0) {
       global_diff = m.GlobalDifference(&stats);
