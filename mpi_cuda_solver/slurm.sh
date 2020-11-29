@@ -2,10 +2,10 @@
 
 #SBATCH --export=NONE
 #SBATCH --partition=gpu2080
-#SBATCH --nodes=8
+#SBATCH --nodes=4
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=24
-#SBATCH --gres=gpu:1
+#SBATCH --gres=gpu:4
 #SBATCH --time=00:20:00
 #SBATCH --exclusive
 #SBATCH --job-name=MPI-solver
@@ -28,4 +28,4 @@ export I_MPI_DEBUG=3
 # alternativ: Ethernet statt Infiniband:
 export I_MPI_FABRICS=shm:tcp
 
-mpirun /home/e/e_zhup01/mpi_cuda_solver/build/mpi_cuda_solver.exe 20000 0.2 1 "/scratch/tmp/e_zhup01/stats_temp.csv"
+mpirun /home/e/e_zhup01/mpi_cuda_solver/build/mpi_cuda_solver.exe 500 0.2 30 "/scratch/tmp/e_zhup01/s_gpu2080_500_02p_4n_24c_4g_temp.csv"

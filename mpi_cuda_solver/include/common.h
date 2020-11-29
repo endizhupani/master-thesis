@@ -95,6 +95,13 @@ public:
    * @return int Number of rows to be processed by the GPU
    */
   int GpuRows(int total_rows) { return ceil(total_rows * (1 - cpu_perc)); }
+
+  char *GetConfId() const {
+    std::string id = "s" + std::to_string(n_rows) + "_g" +
+                     std::to_string(gpu_number) + "_cp" +
+                     std::to_string(cpu_perc * 100);
+    return id.c_str();
+  }
 };
 
 /**
@@ -293,6 +300,7 @@ public:
 
 struct ExecutionStats {
 public:
+  char *id;
   double total_border_calc_time;
   double total_inner_points_time;
   double total_idle_comm_time;
@@ -301,6 +309,7 @@ public:
   double total_time_waiting_to_host_transfer;
   double total_time_waiting_to_device_transfer;
   double last_global_difference;
+  double total_jacobi_time;
   int n_diff_reducions;
   int n_sweeps;
 
@@ -346,9 +355,10 @@ public:
     std::ofstream outputFile;
     outputFile.open(file_path, std::ios_base::app);
     outputFile
-        << "total_border_calc_time,total_inner_points_time,total_idle_comm_"
+        << "id,total_border_calc_time,total_inner_points_time,total_idle_comm_"
            "time,total_sweep_time,total_time_reducing_difference,total_time_"
            "waiting_to_host_transfer,total_time_waiting_to_device_transfer,"
+           "total_jacobi_time,"
            "last_global_difference,n_diff_reducions,n_sweeps\n";
     outputFile.close();
   }
@@ -356,13 +366,13 @@ public:
   void PrintToFile(char *file_path) {
     std::ofstream outputFile;
     outputFile.open(file_path, std::ios_base::app);
-    outputFile << total_border_calc_time << "," << total_inner_points_time
-               << "," << total_idle_comm_time << "," << total_sweep_time << ","
-               << total_time_reducing_difference << ","
-               << total_time_waiting_to_host_transfer << ","
+    outputFile << id << "," << total_border_calc_time << ","
+               << total_inner_points_time << "," << total_idle_comm_time << ","
+               << total_sweep_time << "," << total_time_reducing_difference
+               << "," << total_time_waiting_to_host_transfer << ","
                << total_time_waiting_to_device_transfer << ","
-               << last_global_difference << "," << n_diff_reducions << ","
-               << n_sweeps << "\n";
+               << total_jacobi_time << "," << last_global_difference << ","
+               << n_diff_reducions << "," << n_sweeps << "\n";
     outputFile.close();
   }
 };
