@@ -502,7 +502,7 @@ void Matrix::InitializeMPI(int argc, char *argv[]) {
 }
 
 void Matrix::Finalize() {
-  MPI_Barrier(this->GetCartesianCommunicator());
+  this->Synchronize();
   Deallocate();
 
   // for (size_t i = 0; i < 2; i++) {
@@ -666,17 +666,17 @@ float Matrix::LocalSweep(Matrix new_matrix, ExecutionStats *execution_stats) {
         auto neighbour_top =
             this->GetNeighbour(PartitionNeighbourType::TOP_NEIGHBOUR);
         MPI_Isend(&new_matrix.inner_points_[this->matrix_width_],
-                  this->matrix_width_, MPI_DOUBLE, neighbour_top.id, 0,
+                  this->matrix_width_, MPI_FLOAT, neighbour_top.id, 0,
                   this->GetCartesianCommunicator(), &requests[0]);
-        MPI_Irecv(new_matrix.top_halo_, this->matrix_width_, MPI_DOUBLE,
+        MPI_Irecv(new_matrix.top_halo_, this->matrix_width_, MPI_FLOAT,
                   neighbour_top.id, MPI_ANY_TAG,
                   this->GetCartesianCommunicator(), &requests[2]);
       } else {
         MPI_Isend(&new_matrix.inner_points_[this->matrix_width_],
-                  this->matrix_width_, MPI_DOUBLE, MPI_PROC_NULL, 0,
+                  this->matrix_width_, MPI_FLOAT, MPI_PROC_NULL, 0,
                   this->GetCartesianCommunicator(), &requests[0]);
 
-        MPI_Irecv(new_matrix.top_halo_, this->matrix_width_, MPI_DOUBLE,
+        MPI_Irecv(new_matrix.top_halo_, this->matrix_width_, MPI_FLOAT,
                   MPI_PROC_NULL, MPI_ANY_TAG, this->GetCartesianCommunicator(),
                   &requests[2]);
       }
@@ -705,17 +705,17 @@ float Matrix::LocalSweep(Matrix new_matrix, ExecutionStats *execution_stats) {
             this->GetNeighbour(PartitionNeighbourType::BOTTOM_NEIGHBOUR);
         MPI_Isend(&new_matrix.inner_points_[this->partition_height_ *
                                             this->matrix_width_],
-                  this->matrix_width_, MPI_DOUBLE, neighbour_bottom.id, 0,
+                  this->matrix_width_, MPI_FLOAT, neighbour_bottom.id, 0,
                   this->GetCartesianCommunicator(), &requests[1]);
-        MPI_Irecv(new_matrix.bottom_halo_, this->matrix_width_, MPI_DOUBLE,
+        MPI_Irecv(new_matrix.bottom_halo_, this->matrix_width_, MPI_FLOAT,
                   neighbour_bottom.id, MPI_ANY_TAG,
                   this->GetCartesianCommunicator(), &requests[3]);
       } else {
         MPI_Isend(&new_matrix.inner_points_[this->partition_height_ *
                                             this->matrix_width_],
-                  this->matrix_width_, MPI_DOUBLE, MPI_PROC_NULL, 0,
+                  this->matrix_width_, MPI_FLOAT, MPI_PROC_NULL, 0,
                   this->GetCartesianCommunicator(), &requests[1]);
-        MPI_Irecv(new_matrix.bottom_halo_, this->matrix_width_, MPI_DOUBLE,
+        MPI_Irecv(new_matrix.bottom_halo_, this->matrix_width_, MPI_FLOAT,
                   MPI_PROC_NULL, MPI_ANY_TAG, this->GetCartesianCommunicator(),
                   &requests[3]);
       }
@@ -819,27 +819,6 @@ void Matrix::ExecuteGpuWithConcurrentCopy(Matrix new_matrix,
 
   float *t = new float[gpu_execution_plan.GetGpuDataHeight() *
                        gpu_execution_plan.GetGpuDataWidth()];
-  // cudaMemcpy(t, gpu_execution_plan.d_data,
-  //            gpu_execution_plan.GetGpuDataHeight() *
-  //                gpu_execution_plan.GetGpuDataWidth() * sizeof(float),
-  //            cudaMemcpyDeviceToHost);
-  // for (int i = 0; i < gpu_execution_plan.GetGpuDataHeight(); i++) {
-  //   for (int j = 0; j < gpu_execution_plan.GetGpuDataWidth(); j++) {
-  //     printf("%6.2f ", t[i * gpu_execution_plan.GetGpuDataWidth() + j]);
-  //   }
-  //   putchar('\n');
-  // }
-
-  // delete[] t;
-
-  // printf("Block size: %dx%d\nGrid Size:%dx%d\n\n", block_size.x,
-  // block_size.y,
-  //        grid_size.x, grid_size.y);
-
-  // printf("gpu calculated data: %dx%d\n",
-  //        gpu_execution_plan.GetGpuCalculatedRegionHeight(),
-  //        gpu_execution_plan.GetGpuCalculatedRegionWidth(), grid_size.x,
-  //        grid_size.y);
 
   CUDA_CHECK_RETURN(cudaSetDevice(gpu_execution_plan.gpu_id));
 
@@ -960,10 +939,10 @@ void Matrix::SetGlobal(float value, int row, int col) {
 }
 
 const float Matrix::GlobalDifference(ExecutionStats *execution_stats) {
-  MPI_Barrier(this->GetCartesianCommunicator());
+  this->Synchronize();
   auto reduction_start = MPI_Wtime();
   float received_difference = 0;
-  MPI_Allreduce(&current_max_difference_, &received_difference, 1, MPI_DOUBLE,
+  MPI_Allreduce(&current_max_difference_, &received_difference, 1, MPI_FLOAT,
                 MPI_MAX, this->GetCartesianCommunicator());
   current_max_difference_ = received_difference;
   execution_stats->total_time_reducing_difference +=
@@ -1003,6 +982,7 @@ void Matrix::PrintInnerData() {
 }
 
 void Matrix::ShowMatrix() {
+  this->Synchronize();
   this->AssemblePartition();
   float *partition_data = inner_points_; // this->AssemblePartition();
   float *matrix;
@@ -1012,8 +992,8 @@ void Matrix::ShowMatrix() {
 
   // Need to skip the first row because that is the top halo.
   MPI_Gather(&(partition_data[this->matrix_width_]),
-             this->partition_height_ * this->matrix_width_, MPI_DOUBLE, matrix,
-             this->partition_height_ * this->matrix_width_, MPI_DOUBLE, 0,
+             this->partition_height_ * this->matrix_width_, MPI_FLOAT, matrix,
+             this->partition_height_ * this->matrix_width_, MPI_FLOAT, 0,
              this->GetCartesianCommunicator());
   printf("\n");
   for (int i = 0; i < this->matrix_height_; i++) {
@@ -1026,7 +1006,10 @@ void Matrix::ShowMatrix() {
   delete[] matrix;
 }
 
-void Matrix::Synchronize() { MPI_Barrier(this->GetCartesianCommunicator()); }
+void Matrix::Synchronize() {
+  MPI_Barrier(this->GetCartesianCommunicator());
+  MPI_Barrier(MPI_COMM_WORLD);
+}
 
 void Matrix::GetPartitionCoordinates(int rank, int *partition_coords) {
 

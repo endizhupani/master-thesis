@@ -85,7 +85,7 @@ public:
   int gpu_number;
   int n_rows;
   int n_cols;
-  float cpu_perc;
+  double cpu_perc;
 
   /**
    * @brief Determines the number of rows our the total that should be processed
@@ -96,11 +96,9 @@ public:
    */
   int GpuRows(int total_rows) { return ceil(total_rows * (1 - cpu_perc)); }
 
-  char *GetConfId() const {
-    std::string id = "s" + std::to_string(n_rows) + "_g" +
-                     std::to_string(gpu_number) + "_cp" +
-                     std::to_string(cpu_perc * 100);
-    return id.c_str();
+  std::string GetConfId() {
+    return "s" + std::to_string(n_rows) + "_g" + std::to_string(gpu_number) +
+           "_cp" + std::to_string(cpu_perc * 100);
   }
 };
 
@@ -300,7 +298,7 @@ public:
 
 struct ExecutionStats {
 public:
-  char *id;
+  std::string id;
   double total_border_calc_time;
   double total_inner_points_time;
   double total_idle_comm_time;
@@ -352,6 +350,12 @@ public:
   }
 
   void PrintHeaderToFile(char *file_path) {
+    std::ifstream f(file_path);
+    bool is_empty = f.peek() == std::ifstream::traits_type::eof();
+    f.close();
+    if (!is_empty) {
+      return;
+    }
     std::ofstream outputFile;
     outputFile.open(file_path, std::ios_base::app);
     outputFile

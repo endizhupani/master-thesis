@@ -9,59 +9,62 @@
 
 using namespace std;
 #define EPSILON 0.01
-#define N_THREADS 8
-#define MAX_ITER 10000
+#define MAX_ITER 5000
 
 int getChunkSize(int arrayCount, int numElPerLine);
 
 int run(int run_number, int argc, char *argv[]) {
   int device_count, m_size;
-  float cpu_perc;
+  double cpu_perc;
   char *stats_output = nullptr;
 
   if (argc < 6) {
     m_size = 10;
     device_count = 1;
-    cpu_perc = 0.2;
+    cpu_perc = 30;
   } else {
     device_count = atoi(argv[2]);
     m_size = atoi(argv[1]);
     cpu_perc = atof(argv[3]);
-    if (cpu_perc > 1)
-      cpu_perc /= cpu_perc;
-    *stats_output = argv[5];
+    stats_output = argv[5];
   }
-
+  if (cpu_perc > 1)
+    cpu_perc /= 100;
   MatrixConfiguration conf = {device_count, m_size, m_size, cpu_perc};
-  ExecutionStats stats = {
-      conf.GetConfId(), 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, , 0.0, 0, 0};
+  ExecutionStats stats;
+  stats.id = conf.GetConfId();
+  stats.total_jacobi_time = 0;
+  stats.total_border_calc_time = 0;
+  stats.total_inner_points_time = 0;
+  stats.total_idle_comm_time = 0;
+  stats.total_sweep_time = 0;
+  stats.total_time_reducing_difference = 0;
+  stats.total_time_waiting_to_host_transfer = 0;
+  stats.total_time_waiting_to_device_transfer = 0;
+  stats.last_global_difference = 0;
+  stats.n_diff_reducions = 0;
+  stats.n_sweeps = 0;
   printf("Run number: %d\n", run_number);
+  printf("Configuration:%s\n", conf.GetConfId().c_str());
   double start = MPI_Wtime();
   pde_solver::Matrix m(conf);
-  printf("Initializing the matrix\n");
-
   // old matrix
   m.Init(75, 100, 100, 0, 100, argc, argv);
-  printf("Base matrix initialized. Cloning...\n");
-
   // new matrix. Stores the result of the Jacobi sweep.
   pde_solver::Matrix new_m = m.CloneShell();
   int num_iter = 0;
   float global_diff = 10;
-
   while (global_diff > EPSILON && num_iter < MAX_ITER) {
     m.LocalSweep(new_m, &stats);
     if (num_iter % 4 == 0) {
       global_diff = m.GlobalDifference(&stats);
     }
-
     pde_solver::Matrix tmp = m;
     m = new_m;
     new_m = tmp;
     num_iter++;
   }
-  stats.total_jacobi_time = start - MPI_Wtime();
-
+  stats.total_jacobi_time = MPI_Wtime() - start;
   int process_id = GetProcessId();
   if (process_id == 0) {
     if (stats_output) {
@@ -73,12 +76,9 @@ int run(int run_number, int argc, char *argv[]) {
       stats.print_to_console();
     }
   }
-  printf("\nFinished the computation. Deallocating...\n");
   new_m.Finalize();
-
   m.Finalize();
   m.FinalizeMpi();
-
   return 0;
 }
 
