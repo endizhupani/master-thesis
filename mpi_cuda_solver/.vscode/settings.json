@@ -52,7 +52,17 @@
         "typeinfo": "cpp",
         "chrono": "cpp",
         "ratio": "cpp",
-        "*.cuh": "cpp"
+        "*.cuh": "cpp",
+        "bitset": "cpp",
+        "codecvt": "cpp",
+        "condition_variable": "cpp",
+        "cstring": "cpp",
+        "ctime": "cpp",
+        "set": "cpp",
+        "iomanip": "cpp",
+        "mutex": "cpp",
+        "thread": "cpp",
+        "__nullptr": "cpp"
     },
     "editor.tabSize": 2
 }
