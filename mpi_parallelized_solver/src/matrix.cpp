@@ -404,7 +404,6 @@ void Matrix::Finalize() {
 }
 
 double Matrix::LocalSweep(Matrix new_matrix) {
-  printf("got here\n");
   this->current_max_difference_ = 0;
   double diff, new_value;
   // 4 sends and 4 receives
@@ -413,205 +412,209 @@ double Matrix::LocalSweep(Matrix new_matrix) {
   // TODO (endizhupani@uni-muenster.de): first calculate the border points.
   // Afterwards exchange those with neighbours. while exchanging, calculate the
   // inner points.
-#pragma omp parallel sections firstprivate(diff, new_value, max_thread_num)    \
-    num_threads(std::min(max_thread_num, 4))                                   \
-        reduction(max                                                          \
-                  : current_max_difference_)
-  {
-    // Left border
-#pragma omp section
-    {
-      if (!this->IsLeftBorder()) {
-        if (!this->IsTopBorder()) {
-          new_value = (this->left_ghost_points_[0] + this->top_ghost[0] +
-                       this->GetLocal(0, 1) + this->GetLocal(1, 0)) /
-                      4;
-          diff = fabs(new_value - this->GetLocal(0, 0));
-          if (diff > current_max_difference_) {
-            current_max_difference_ = diff;
-          }
-          new_matrix.SetLocal(new_value, 0, 0);
-        }
-#pragma omp parallel for
-        for (int i = 1; i < this->partition_height_ - 1; i++) {
-          new_value = (this->GetLocal(i - 1, 0) + this->GetLocal(i + 1, 0) +
-                       this->left_ghost_points_[i] + this->GetLocal(i, 1)) /
-                      4;
-          diff = fabs(new_value - this->GetLocal(i, 0));
-          if (diff > current_max_difference_) {
-            current_max_difference_ = diff;
-          }
-          new_matrix.SetLocal(new_value, i, 0);
-        }
-
-        if (!this->IsBottomBorder()) {
-          new_value = (this->left_ghost_points_[this->partition_height_ - 1] +
-                       this->bottom_ghost[0] +
-                       this->GetLocal(this->partition_height_ - 2, 0) +
-                       this->GetLocal(this->partition_height_ - 1, 1)) /
-                      4;
-          diff =
-              fabs(new_value - this->GetLocal(this->partition_height_ - 1, 0));
-          if (diff > current_max_difference_) {
-            current_max_difference_ = diff;
-          }
-          new_matrix.SetLocal(new_value, this->partition_height_ - 1, 0);
-        }
-        auto neighbour_left =
-            this->GetNeighbour(PartitionNeighbourType::LEFT_NEIGHTBOUR);
-
-        MPI_Isend(new_matrix.left_border_, this->partition_height_, MPI_DOUBLE,
-                  neighbour_left.id, 0, this->GetCartesianCommunicator(),
-                  &requests[0]);
-        MPI_Irecv(new_matrix.left_ghost_points_, this->partition_height_,
-                  MPI_DOUBLE, neighbour_left.id, MPI_ANY_TAG,
-                  this->GetCartesianCommunicator(), &requests[4]);
-      } else {
-        MPI_Isend(this->left_border_, this->partition_height_, MPI_DOUBLE,
-                  MPI_PROC_NULL, 0, this->GetCartesianCommunicator(),
-                  &requests[0]);
-        MPI_Irecv(new_matrix.left_ghost_points_, this->partition_height_,
-                  MPI_DOUBLE, MPI_PROC_NULL, MPI_ANY_TAG,
-                  this->GetCartesianCommunicator(), &requests[4]);
+  // #pragma omp parallel sections firstprivate(diff, new_value, max_thread_num)
+  // \
+//     num_threads(std::min(max_thread_num, 4)) \
+//         reduction(max \
+//                   : current_max_difference_)
+  //   {
+  // Left border
+  // #pragma omp section
+  //     {
+  if (!this->IsLeftBorder()) {
+    if (!this->IsTopBorder()) {
+      new_value = (this->left_ghost_points_[0] + this->top_ghost[0] +
+                   this->GetLocal(0, 1) + this->GetLocal(1, 0)) /
+                  4;
+      diff = fabs(new_value - this->GetLocal(0, 0));
+      if (diff > current_max_difference_) {
+        current_max_difference_ = diff;
       }
+      new_matrix.SetLocal(new_value, 0, 0);
     }
-// Right border
-#pragma omp section
-    {
-      if (!this->IsRightBorder()) {
-        if (!this->IsTopBorder()) {
-          new_value = (this->right_ghost_points_[0] +
-                       this->top_ghost[this->partition_width_ - 1] +
-                       this->GetLocal(0, this->partition_width_ - 2) +
-                       this->GetLocal(1, this->partition_width_ - 1)) /
-                      4;
-          diff =
-              fabs(new_value - this->GetLocal(0, this->partition_width_ - 1));
-          if (diff > current_max_difference_) {
-            current_max_difference_ = diff;
-          }
-          new_matrix.SetLocal(new_value, 0, this->partition_width_ - 1);
-        }
-
-#pragma omp parallel for
-        for (int i = 1; i < this->partition_height_ - 1; i++) {
-          new_value = (this->GetLocal(i, this->partition_width_ - 2) +
-                       this->right_ghost_points_[i] +
-                       this->GetLocal(i - 1, this->partition_width_ - 1) +
-                       this->GetLocal(i + 1, this->partition_width_ - 1)) /
-                      4;
-          diff =
-              fabs(new_value - this->GetLocal(i, this->partition_width_ - 1));
-          if (diff > current_max_difference_) {
-            current_max_difference_ = diff;
-          }
-
-          new_matrix.SetLocal(new_value, i, this->partition_width_ - 1);
-        }
-
-        if (!this->IsBottomBorder()) {
-          new_value = (this->right_ghost_points_[this->partition_height_ - 1] +
-                       this->bottom_ghost[this->partition_width_ - 1] +
-                       this->GetLocal(this->partition_height_ - 1,
-                                      this->partition_width_ - 2) +
-                       this->GetLocal(this->partition_height_ - 2,
-                                      this->partition_width_ - 1)) /
-                      4;
-          diff = fabs(new_value - this->GetLocal(this->partition_height_ - 1,
-                                                 this->partition_width_ - 1));
-          if (diff > current_max_difference_) {
-            current_max_difference_ = diff;
-          }
-          new_matrix.SetLocal(new_value, this->partition_height_ - 1,
-                              this->partition_width_ - 1);
-        }
-        auto neighbour_right =
-            this->GetNeighbour(PartitionNeighbourType::RIGHT_NEIGHBOUR);
-
-        MPI_Isend(new_matrix.right_border_, this->partition_height_, MPI_DOUBLE,
-                  neighbour_right.id, 0, this->GetCartesianCommunicator(),
-                  &requests[1]);
-        MPI_Irecv(new_matrix.right_ghost_points_, this->partition_height_,
-                  MPI_DOUBLE, neighbour_right.id, MPI_ANY_TAG,
-                  this->GetCartesianCommunicator(), &requests[5]);
-      } else {
-        MPI_Isend(new_matrix.right_border_, this->partition_height_, MPI_DOUBLE,
-                  MPI_PROC_NULL, 0, this->GetCartesianCommunicator(),
-                  &requests[1]);
-        MPI_Irecv(new_matrix.right_ghost_points_, this->partition_height_,
-                  MPI_DOUBLE, MPI_PROC_NULL, MPI_ANY_TAG,
-                  this->GetCartesianCommunicator(), &requests[5]);
+#pragma omp parallel for private(diff, new_value)                              \
+    reduction(max                                                              \
+              : current_max_difference_)
+    for (int i = 1; i < this->partition_height_ - 1; i++) {
+      new_value = (this->GetLocal(i - 1, 0) + this->GetLocal(i + 1, 0) +
+                   this->left_ghost_points_[i] + this->GetLocal(i, 1)) /
+                  4;
+      diff = fabs(new_value - this->GetLocal(i, 0));
+      if (diff > current_max_difference_) {
+        current_max_difference_ = diff;
       }
+      new_matrix.SetLocal(new_value, i, 0);
     }
-#pragma omp section
-    {
-      if (!this->IsTopBorder()) {
-#pragma omp parallel for
-        for (int i = 1; i < this->partition_width_ - 1; i++) {
-          new_value = (this->GetLocal(0, i - 1) + this->GetLocal(0, i + 1) +
-                       this->GetLocal(1, i) + this->top_ghost[i]) /
-                      4;
-          diff = fabs(new_value - this->GetLocal(0, i));
-          if (diff > current_max_difference_) {
-            current_max_difference_ = diff;
-          }
-          new_matrix.SetLocal(new_value, 0, i);
-        }
 
-        auto neighbour_top =
-            this->GetNeighbour(PartitionNeighbourType::TOP_NEIGHBOUR);
-        MPI_Isend(&new_matrix.inner_points_[this->partition_width_],
-                  this->partition_width_, MPI_DOUBLE, neighbour_top.id, 0,
-                  this->GetCartesianCommunicator(), &requests[2]);
-        MPI_Irecv(new_matrix.top_ghost, this->partition_width_, MPI_DOUBLE,
-                  neighbour_top.id, MPI_ANY_TAG,
-                  this->GetCartesianCommunicator(), &requests[6]);
-      } else {
-        MPI_Isend(&new_matrix.inner_points_[this->partition_width_],
-                  this->partition_width_, MPI_DOUBLE, MPI_PROC_NULL, 0,
-                  this->GetCartesianCommunicator(), &requests[2]);
-        MPI_Irecv(new_matrix.top_ghost, this->partition_width_, MPI_DOUBLE,
-                  MPI_PROC_NULL, MPI_ANY_TAG, this->GetCartesianCommunicator(),
-                  &requests[6]);
+    if (!this->IsBottomBorder()) {
+      new_value = (this->left_ghost_points_[this->partition_height_ - 1] +
+                   this->bottom_ghost[0] +
+                   this->GetLocal(this->partition_height_ - 2, 0) +
+                   this->GetLocal(this->partition_height_ - 1, 1)) /
+                  4;
+      diff = fabs(new_value - this->GetLocal(this->partition_height_ - 1, 0));
+      if (diff > current_max_difference_) {
+        current_max_difference_ = diff;
       }
+      new_matrix.SetLocal(new_value, this->partition_height_ - 1, 0);
     }
-#pragma omp section
-    {
-      if (!this->IsBottomBorder()) {
-        new_matrix.SetLocal(new_value, this->partition_height_ - 1, 1);
-#pragma omp parallel for
-        for (int i = 1; i < this->partition_width_ - 1; i++) {
-          new_value = (this->GetLocal(this->partition_height_ - 1, i - 1) +
-                       this->GetLocal(this->partition_height_ - 1, i + 1) +
-                       this->GetLocal(this->partition_height_ - 2, i) +
-                       this->bottom_ghost[i]) /
-                      4;
-          if (diff > current_max_difference_) {
-            current_max_difference_ = diff;
-          }
-          new_matrix.SetLocal(new_value, this->partition_height_ - 1, i);
-        }
+    auto neighbour_left =
+        this->GetNeighbour(PartitionNeighbourType::LEFT_NEIGHTBOUR);
 
-        auto neighbour_bottom =
-            this->GetNeighbour(PartitionNeighbourType::BOTTOM_NEIGHBOUR);
-        MPI_Isend(&new_matrix.inner_points_[this->partition_height_ *
-                                            this->partition_width_],
-                  this->partition_width_, MPI_DOUBLE, neighbour_bottom.id, 0,
-                  this->GetCartesianCommunicator(), &requests[3]);
-        MPI_Irecv(new_matrix.bottom_ghost, this->partition_width_, MPI_DOUBLE,
-                  neighbour_bottom.id, MPI_ANY_TAG,
-                  this->GetCartesianCommunicator(), &requests[7]);
-      } else {
-        MPI_Isend(&new_matrix.inner_points_[this->partition_height_ *
-                                            this->partition_width_],
-                  this->partition_width_, MPI_DOUBLE, MPI_PROC_NULL, 0,
-                  this->GetCartesianCommunicator(), &requests[3]);
-        MPI_Irecv(new_matrix.bottom_ghost, this->partition_width_, MPI_DOUBLE,
-                  MPI_PROC_NULL, MPI_ANY_TAG, this->GetCartesianCommunicator(),
-                  &requests[7]);
-      }
-    }
+    MPI_Isend(new_matrix.left_border_, this->partition_height_, MPI_DOUBLE,
+              neighbour_left.id, 0, this->GetCartesianCommunicator(),
+              &requests[0]);
+    MPI_Irecv(new_matrix.left_ghost_points_, this->partition_height_,
+              MPI_DOUBLE, neighbour_left.id, MPI_ANY_TAG,
+              this->GetCartesianCommunicator(), &requests[4]);
+  } else {
+    MPI_Isend(this->left_border_, this->partition_height_, MPI_DOUBLE,
+              MPI_PROC_NULL, 0, this->GetCartesianCommunicator(), &requests[0]);
+    MPI_Irecv(new_matrix.left_ghost_points_, this->partition_height_,
+              MPI_DOUBLE, MPI_PROC_NULL, MPI_ANY_TAG,
+              this->GetCartesianCommunicator(), &requests[4]);
   }
+  //}
+  // Right border
+  //#pragma omp section
+  //  {
+  if (!this->IsRightBorder()) {
+    if (!this->IsTopBorder()) {
+      new_value = (this->right_ghost_points_[0] +
+                   this->top_ghost[this->partition_width_ - 1] +
+                   this->GetLocal(0, this->partition_width_ - 2) +
+                   this->GetLocal(1, this->partition_width_ - 1)) /
+                  4;
+      diff = fabs(new_value - this->GetLocal(0, this->partition_width_ - 1));
+      if (diff > current_max_difference_) {
+        current_max_difference_ = diff;
+      }
+      new_matrix.SetLocal(new_value, 0, this->partition_width_ - 1);
+    }
+
+#pragma omp parallel for private(diff, new_value)                              \
+    reduction(max                                                              \
+              : current_max_difference_)
+    for (int i = 1; i < this->partition_height_ - 1; i++) {
+      new_value = (this->GetLocal(i, this->partition_width_ - 2) +
+                   this->right_ghost_points_[i] +
+                   this->GetLocal(i - 1, this->partition_width_ - 1) +
+                   this->GetLocal(i + 1, this->partition_width_ - 1)) /
+                  4;
+      diff = fabs(new_value - this->GetLocal(i, this->partition_width_ - 1));
+      if (diff > current_max_difference_) {
+        current_max_difference_ = diff;
+      }
+
+      new_matrix.SetLocal(new_value, i, this->partition_width_ - 1);
+    }
+
+    if (!this->IsBottomBorder()) {
+      new_value = (this->right_ghost_points_[this->partition_height_ - 1] +
+                   this->bottom_ghost[this->partition_width_ - 1] +
+                   this->GetLocal(this->partition_height_ - 1,
+                                  this->partition_width_ - 2) +
+                   this->GetLocal(this->partition_height_ - 2,
+                                  this->partition_width_ - 1)) /
+                  4;
+      diff = fabs(new_value - this->GetLocal(this->partition_height_ - 1,
+                                             this->partition_width_ - 1));
+      if (diff > current_max_difference_) {
+        current_max_difference_ = diff;
+      }
+      new_matrix.SetLocal(new_value, this->partition_height_ - 1,
+                          this->partition_width_ - 1);
+    }
+    auto neighbour_right =
+        this->GetNeighbour(PartitionNeighbourType::RIGHT_NEIGHBOUR);
+
+    MPI_Isend(new_matrix.right_border_, this->partition_height_, MPI_DOUBLE,
+              neighbour_right.id, 0, this->GetCartesianCommunicator(),
+              &requests[1]);
+    MPI_Irecv(new_matrix.right_ghost_points_, this->partition_height_,
+              MPI_DOUBLE, neighbour_right.id, MPI_ANY_TAG,
+              this->GetCartesianCommunicator(), &requests[5]);
+  } else {
+    MPI_Isend(new_matrix.right_border_, this->partition_height_, MPI_DOUBLE,
+              MPI_PROC_NULL, 0, this->GetCartesianCommunicator(), &requests[1]);
+    MPI_Irecv(new_matrix.right_ghost_points_, this->partition_height_,
+              MPI_DOUBLE, MPI_PROC_NULL, MPI_ANY_TAG,
+              this->GetCartesianCommunicator(), &requests[5]);
+  }
+  //  }
+  //#pragma omp section
+  //  {
+  if (!this->IsTopBorder()) {
+#pragma omp parallel for private(diff, new_value)                              \
+    reduction(max                                                              \
+              : current_max_difference_)
+    for (int i = 1; i < this->partition_width_ - 1; i++) {
+      new_value = (this->GetLocal(0, i - 1) + this->GetLocal(0, i + 1) +
+                   this->GetLocal(1, i) + this->top_ghost[i]) /
+                  4;
+      diff = fabs(new_value - this->GetLocal(0, i));
+      if (diff > current_max_difference_) {
+        current_max_difference_ = diff;
+      }
+      new_matrix.SetLocal(new_value, 0, i);
+    }
+
+    auto neighbour_top =
+        this->GetNeighbour(PartitionNeighbourType::TOP_NEIGHBOUR);
+    MPI_Isend(&new_matrix.inner_points_[this->partition_width_],
+              this->partition_width_, MPI_DOUBLE, neighbour_top.id, 0,
+              this->GetCartesianCommunicator(), &requests[2]);
+    MPI_Irecv(new_matrix.top_ghost, this->partition_width_, MPI_DOUBLE,
+              neighbour_top.id, MPI_ANY_TAG, this->GetCartesianCommunicator(),
+              &requests[6]);
+  } else {
+    MPI_Isend(&new_matrix.inner_points_[this->partition_width_],
+              this->partition_width_, MPI_DOUBLE, MPI_PROC_NULL, 0,
+              this->GetCartesianCommunicator(), &requests[2]);
+    MPI_Irecv(new_matrix.top_ghost, this->partition_width_, MPI_DOUBLE,
+              MPI_PROC_NULL, MPI_ANY_TAG, this->GetCartesianCommunicator(),
+              &requests[6]);
+  }
+  //  }
+  //#pragma omp section
+  //  {
+  if (!this->IsBottomBorder()) {
+    new_matrix.SetLocal(new_value, this->partition_height_ - 1, 1);
+#pragma omp parallel for private(diff, new_value)                              \
+    reduction(max                                                              \
+              : current_max_difference_)
+    for (int i = 1; i < this->partition_width_ - 1; i++) {
+      new_value = (this->GetLocal(this->partition_height_ - 1, i - 1) +
+                   this->GetLocal(this->partition_height_ - 1, i + 1) +
+                   this->GetLocal(this->partition_height_ - 2, i) +
+                   this->bottom_ghost[i]) /
+                  4;
+      if (diff > current_max_difference_) {
+        current_max_difference_ = diff;
+      }
+      new_matrix.SetLocal(new_value, this->partition_height_ - 1, i);
+    }
+
+    auto neighbour_bottom =
+        this->GetNeighbour(PartitionNeighbourType::BOTTOM_NEIGHBOUR);
+    MPI_Isend(&new_matrix.inner_points_[this->partition_height_ *
+                                        this->partition_width_],
+              this->partition_width_, MPI_DOUBLE, neighbour_bottom.id, 0,
+              this->GetCartesianCommunicator(), &requests[3]);
+    MPI_Irecv(new_matrix.bottom_ghost, this->partition_width_, MPI_DOUBLE,
+              neighbour_bottom.id, MPI_ANY_TAG,
+              this->GetCartesianCommunicator(), &requests[7]);
+  } else {
+    MPI_Isend(&new_matrix.inner_points_[this->partition_height_ *
+                                        this->partition_width_],
+              this->partition_width_, MPI_DOUBLE, MPI_PROC_NULL, 0,
+              this->GetCartesianCommunicator(), &requests[3]);
+    MPI_Irecv(new_matrix.bottom_ghost, this->partition_width_, MPI_DOUBLE,
+              MPI_PROC_NULL, MPI_ANY_TAG, this->GetCartesianCommunicator(),
+              &requests[7]);
+  }
+  //  }
+  //}
 #pragma omp parallel for collapse(2) private(diff, new_value)                  \
     reduction(max                                                              \
               : current_max_difference_)
@@ -628,7 +631,6 @@ double Matrix::LocalSweep(Matrix new_matrix) {
     }
   }
   MPI_Waitall(8, requests, MPI_STATUSES_IGNORE);
-  printf("Process: %d got here1\n", this->proc_id_);
   return current_max_difference_;
 }
 

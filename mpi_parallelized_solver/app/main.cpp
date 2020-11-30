@@ -8,7 +8,7 @@
 using namespace std;
 #define N 30
 #define EPSILON 0.01
-#define MAX_ITER 1
+#define MAX_ITER 5000
 //#define CACHE_LINE_SIZE sysconf(_SC_LEVEL1_DCACHE_LINESIZE)
 
 int getChunkSize(int arrayCount, int numElPerLine);
@@ -34,14 +34,15 @@ int main(int argc, char *argv[]) {
     pde_solver::data::cpu_distr::Matrix tmp = m;
     m = new_m;
     new_m = tmp;
+    num_iter++;
   }
 
-  // m.Synchronize();
+  m.Synchronize();
   m.PrintAllPartitions();
   // m.ShowMatrix();
 
   new_m.Deallocate();
-
+  m.Synchronize();
   m.Finalize();
   printf("iter: %d\n", num_iter);
   printf("difference: %f\n", global_diff);
