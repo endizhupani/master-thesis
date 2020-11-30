@@ -1,155 +1,112 @@
+#include <chrono>
+#include <fstream>
 #include <iostream>
 #include <math.h>
-#include <chrono>
-#include <array>
+
 using namespace std;
-#define N 4000
 #define EPSILON 0.01
 #define MAX_ITER 10000
 
-void run_matrix_as_array()
-{
-    printf("Matrix is stored as an array.\nMatrix size: %d rows by %d columns\n", N, N);
-    int i, j;
-    double globalDiff = 500;
-    double mean = 0.0;
-    double *u = new double[N * N];
-    double *w = new double[N * N];
-    double *tmp;
-    for (i = 0; i < N; i++)
-    {
-        u[i * N] = u[i * N + (N - 1)] = u[i] = w[i * N] = w[i * N + (N - 1)] = w[i] = 100;
-        u[(N - 1) * N + i] = w[(N - 1) * N + i] = 0;
-        mean += u[i * N] + u[i * N + (N - 1)] + u[i] + u[(N - 1) * N + i];
+double run_matrix_as_array(int matrix_size) {
+  auto full_calc_start = std::chrono::high_resolution_clock::now();
+  printf("Matrix is stored as an array.\nMatrix size: %d rows by %d columns\n",
+         matrix_size, matrix_size);
+  int i, j;
+  double globalDiff = 500;
+  double *u = new double[matrix_size * matrix_size];
+  double *w = new double[matrix_size * matrix_size];
+  double *tmp;
+  for (i = 0; i < matrix_size; i++) {
+    u[i * matrix_size] = u[i * matrix_size + (matrix_size - 1)] = u[i] =
+        w[i * matrix_size] = w[i * matrix_size + (matrix_size - 1)] = w[i] =
+            100;
+    u[(matrix_size - 1) * matrix_size + i] =
+        w[(matrix_size - 1) * matrix_size + i] = 0;
+  }
+
+  for (i = matrix_size; i < (matrix_size * matrix_size) - matrix_size; i++) {
+    if (i % matrix_size == 0 || (i - (matrix_size - 1)) % matrix_size == 0) {
+      continue;
+    }
+    u[i] = 75;
+  }
+
+  int num_iter = 0;
+
+  while (globalDiff > EPSILON && num_iter < MAX_ITER) {
+    globalDiff = 0.0;
+
+    auto calc_loop_start = std::chrono::high_resolution_clock::now();
+    for (i = matrix_size + 1; i < (matrix_size * matrix_size) - matrix_size - 1;
+         i++) {
+      if (i % matrix_size == 0 || (i - (matrix_size - 1)) % matrix_size == 0) {
+        continue;
+      }
+
+      w[i] =
+          (u[i - 1] + u[i + 1] + u[i - matrix_size] + u[i + matrix_size]) / 4;
+      auto difference = fabs(w[i] - u[i]);
+      if (difference > globalDiff) {
+        globalDiff = difference;
+      }
     }
 
-    mean /= (4 * N);
+    num_iter++;
+    tmp = u;
+    u = w;
+    w = tmp;
+  }
 
-    for (i = N; i < (N * N) - N; i++)
-    {
-        if (i % N == 0 || (i - (N - 1)) % N == 0)
-        {
-            continue;
-        }
-        u[i] = mean;
-    }
+  auto full_calc_finish = std::chrono::high_resolution_clock::now();
 
-    auto full_calc_start = std::chrono::high_resolution_clock::now();
-    int num_iter = 0;
+  std::chrono::duration<double> elapsed = full_calc_finish - full_calc_start;
+  //   for (i = 0; i < matrix_size; i++) {
+  //     for (j = 0; j < matrix_size; j++) {
+  //       printf("%6.2f ", u[i * matrix_size + j]);
+  //     }
+  //     putchar('\n');
+  //   }
 
-    while (globalDiff > EPSILON && num_iter < MAX_ITER)
-    {
-        globalDiff = 0.0;
-
-        auto calc_loop_start = std::chrono::high_resolution_clock::now();
-        for (i = N + 1; i < (N * N) - N - 1; i++)
-        {
-            if (i % N == 0 || (i - (N - 1)) % N == 0)
-            {
-                continue;
-            }
-
-            w[i] = (u[i - 1] + u[i + 1] + u[i - N] + u[i + N]) / 4;
-            auto difference = fabs(w[i] - u[i]);
-            if (difference > globalDiff)
-            {
-                globalDiff = difference;
-            }
-        }
-
-        num_iter++;
-        if (globalDiff <= EPSILON || num_iter > 1815)
-            break;
-
-        tmp = u;
-        u = w;
-        w = tmp;
-    }
-
-    auto full_calc_finish = std::chrono::high_resolution_clock::now();
-    printf("Results with matrix stored as row major array: \n");
-    printf("num_iter: %d\n", num_iter);
-    std::chrono::duration<double> elapsed = full_calc_finish - full_calc_start;
-    printf("full_calc_time: %f\n", elapsed.count());
-
-    // printf("calc_loop_min: %f\n", calc_loop_min);
-    // printf("calc_loop_max: %f\n", calc_loop_max);
-    // printf("calc_loop_avg: %f\n", calc_loop_avg / num_iter);
-
-    // //        for(i = 0; i < N; i++){
-    // //        for (j = 0; j < N; j++) {
-    // //            printf("%6.2f ", u[i][j]);
-    // //        }
-    // //        putchar('\n');
-    // //    }
-
-    delete[] u;
-    delete[] w;
+  delete[] u;
+  delete[] w;
+  auto time = elapsed.count();
+  printf("Finished in %d iterations. Elapsed time: %f\n", num_iter, time);
+  return time;
 }
 
-void run_matrix_as_matrix()
-{
+int main(int argc, char *argv[]) {
+  int m_size = 1000;
+  int n_runs = 1;
+  char *file;
+  if (argc < 4) {
+    cout << "please specify the matrix size, num runs and the stats output "
+            "file path.";
+  } else {
+    m_size = atoi(argv[1]);
+    n_runs = atoi(argv[2]);
+    file = argv[3];
+  }
 
-    double globalDiff = 500, mean;
-    int i, j;
-    auto u = new double[N][N];
-    auto w = new double[N][N];
+  double tot_time = 0;
+  for (int i = 1; i <= n_runs; i++) {
+    tot_time += run_matrix_as_array(m_size);
+  }
 
-    mean = 0.0;
-    for (i = 0; i < N; i++)
-    {
-        u[i][0] = w[i][0] = u[i][N - 1] = w[i][N - 1] = u[0][i] = w[0][i] = 100;
-        u[N - 1][i] = w[N - 1][i] = 0;
-        mean += u[i][0] + u[i][N - 1] + u[0][i] + u[N - 1][i];
-    }
+  double avg = tot_time / n_runs;
 
-    mean /= (4 * N);
-
-    for (i = 1; i < N - 1; i++)
-    {
-        for (j = 1; j < N - 1; j++)
-        {
-            u[i][j] = mean;
-        }
-    }
-    auto full_calc_start = std::chrono::high_resolution_clock::now();
-    int num_iter = 0;
-    double calc_loop_min = 1000000;
-    double calc_loop_max = 0;
-    double calc_loop_avg = 0;
-    while (globalDiff > EPSILON && num_iter < 1)
-    {
-        globalDiff = 0.0;
-
-        for (int i = 1; i < N - 1; i++)
-        {
-
-            for (int j = 1; j < N - 1; j++)
-            {
-                w[i][j] = (u[i - 1][j] + u[i + 1][j] + u[i][j - 1] + u[i][j + 1]) / 4;
-                globalDiff = max(globalDiff, fabs(w[i][j] - u[i][j]));
-            }
-        }
-
-        swap(w, u);
-
-        if (num_iter++ % 100 == 0)
-            printf("%5d, %0.6f\n", num_iter, globalDiff);
-    }
-
-    auto full_calc_finish = std::chrono::high_resolution_clock::now();
-    printf("Results with matrix stored as array of pointers: \n");
-    printf("num_iter: %d\n", num_iter);
-    std::chrono::duration<double> elapsed = full_calc_finish - full_calc_start;
-    printf("full_calc_time: %f\n", elapsed.count());
-
-    delete[] u;
-
-    delete[] w;
-}
-
-int main()
-{
-    //run_matrix_as_matrix();
-    run_matrix_as_array();
+  if (!file) {
+    printf("Average time = %f\n", avg);
+    exit(0);
+  }
+  std::ifstream f(file);
+  bool is_empty = f.peek() == std::ifstream::traits_type::eof();
+  f.close();
+  std::ofstream outputFile;
+  outputFile.open(file, std::ios_base::app);
+  if (is_empty) {
+    outputFile << "id,avg_time\n";
+  }
+  outputFile << m_size << "," << avg << endl;
+  outputFile.close();
+  exit(0);
 }
