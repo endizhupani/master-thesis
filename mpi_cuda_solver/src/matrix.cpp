@@ -437,7 +437,7 @@ void Matrix::Init(float inner_value, float left_border_value,
   this->ConfigGpuExecution();
   this->InitData(inner_value, left_border_value, right_border_value,
                  bottom_border_value, top_border_value);
-  MPI_Barrier(this->GetCartesianCommunicator());
+  this->Synchronize();
 }
 
 void Matrix::PrintMatrixInfo() {
@@ -446,7 +446,7 @@ void Matrix::PrintMatrixInfo() {
     // int deviceCount = 0;
     // printf("Number of GPUs: %d\n", deviceCount);
   }
-  MPI_Barrier(this->GetCartesianCommunicator());
+  this->Synchronize();
   std::cout << "Processor id: " << this->proc_id_ << "; Coordinates: ("
             << this->partition_coords_[0] << ", " << this->partition_coords_[1]
             << "); Top ID: " << this->neighbours[0].GetNeighborId()
@@ -454,7 +454,7 @@ void Matrix::PrintMatrixInfo() {
             << "; Partition size: " << this->matrix_width_ << "x"
             << this->partition_height_ << std::endl;
 
-  MPI_Barrier(this->GetCartesianCommunicator());
+  this->Synchronize();
 }
 
 void Matrix::RankByCoordinates(const int coords[2], int *rank) {
@@ -529,7 +529,7 @@ void Matrix::Finalize() {
 }
 
 void Matrix::FinalizeMpi() {
-  MPI_Barrier(this->GetCartesianCommunicator());
+  this->Synchronize();
   MPI_Comm *handle;
   handle = &cartesian_communicator_;
   MPI_Comm_free(handle);
@@ -776,6 +776,8 @@ float Matrix::LocalSweep(Matrix new_matrix, ExecutionStats *execution_stats) {
 
     GpuReductionOperation &reduction_operation =
         this->GetInnerReductionOperation(i);
+    // printf("Reduction on the gpu on process %d: %f\n", this->proc_id_,
+    //        reduction_operation.h_reduction_result[0]);
     if (reduction_operation.h_reduction_result[0] >
         this->current_max_difference_) {
       this->current_max_difference_ = reduction_operation.h_reduction_result[0];
@@ -839,6 +841,9 @@ void Matrix::ExecuteGpuWithConcurrentCopy(Matrix new_matrix,
   cudaEvent_t kernel_computation_complete;
   CUDA_CHECK_RETURN(cudaEventCreateWithFlags(&kernel_computation_complete,
                                              cudaEventDisableTiming));
+  // printf("Process %d. GPU data size %dx%d\n", this->proc_id_,
+  //        gpu_execution_plan.GetGpuCalculatedRegionWidth(),
+  //        gpu_execution_plan.GetGpuCalculatedRegionHeight());
   LaunchJacobiKernel(gpu_execution_plan.d_data, new_matrix_stream.d_data,
                      reduction_operation.d_vector_to_reduce,
                      gpu_execution_plan.GetGpuCalculatedRegionWidth(),
@@ -941,7 +946,7 @@ void Matrix::SetGlobal(float value, int row, int col) {
 const float Matrix::GlobalDifference(ExecutionStats *execution_stats) {
   this->Synchronize();
   auto reduction_start = MPI_Wtime();
-  float received_difference = 0;
+  float received_difference;
   MPI_Allreduce(&current_max_difference_, &received_difference, 1, MPI_FLOAT,
                 MPI_MAX, this->GetCartesianCommunicator());
   current_max_difference_ = received_difference;
@@ -1035,7 +1040,7 @@ void Matrix::PrintPartitionData() {
 
 void Matrix::PrintAllPartitions() {
   for (int i = 0; i < this->proc_count_; i++) {
-    MPI_Barrier(this->GetCartesianCommunicator());
+    this->Synchronize();
     if (i == this->proc_id_) {
       this->PrintPartitionData();
       fflush(stdout);

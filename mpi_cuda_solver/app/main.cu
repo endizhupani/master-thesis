@@ -19,9 +19,9 @@ int run(int run_number, int argc, char *argv[]) {
   char *stats_output = nullptr;
 
   if (argc < 6) {
-    m_size = 10;
+    m_size = 50;
     device_count = 1;
-    cpu_perc = 30;
+    cpu_perc = 0.1;
   } else {
     device_count = atoi(argv[2]);
     m_size = atoi(argv[1]);
@@ -54,18 +54,22 @@ int run(int run_number, int argc, char *argv[]) {
   pde_solver::Matrix new_m = m.CloneShell();
   int num_iter = 0;
   float global_diff = 10;
+  int process_id = GetProcessId();
   while (global_diff > EPSILON && num_iter < MAX_ITER) {
-    m.LocalSweep(new_m, &stats);
+    float diff = m.LocalSweep(new_m, &stats);
+    // printf("localdiff on proc %d: %f\n", process_id, diff);
     if (num_iter % 4 == 0) {
       global_diff = m.GlobalDifference(&stats);
+      // printf("Global diff: %f\n", global_diff);
     }
     pde_solver::Matrix tmp = m;
     m = new_m;
     new_m = tmp;
     num_iter++;
+    // m.ShowMatrix();
   }
   stats.total_jacobi_time = MPI_Wtime() - start;
-  int process_id = GetProcessId();
+
   if (process_id == 0) {
     if (stats_output) {
       if (run_number == 1) {
