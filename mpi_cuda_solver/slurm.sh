@@ -20,7 +20,7 @@ module load CMake/3.15.3
 cd /home/e/e_zhup01/mpi_cuda_solver
 
 ./build-release.sh
-export OMP_NUM_THREADS=4
+export OMP_NUM_THREADS=24
 
 # vorl�ufig, bis MPI �ber Infiniband funktioniert
 export I_MPI_DEBUG=3
