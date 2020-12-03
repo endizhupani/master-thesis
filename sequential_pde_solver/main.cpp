@@ -3,7 +3,7 @@
 #include <math.h>
 #include <time.h>
 #define EPSILON 0.01
-#define MAX_ITER 50
+#define MAX_ITER 5000
 
 double run_matrix_as_array(int matrix_size) {
   double start = clock();
