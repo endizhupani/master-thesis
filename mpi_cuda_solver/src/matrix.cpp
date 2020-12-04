@@ -26,26 +26,12 @@
 #include "matrix.h"
 
 namespace pde_solver {
-Matrix::Matrix(int halo_size, int width, int height)
-    : pde_solver::BaseMatrix(width, height) {
-  this->halo_size_ = halo_size;
-  this->is_initialized_ = false;
-  this->processes_per_dimension_[0] = 0;
-
-  // the number of processes along the horizontal dimension should always be
-  // equal to 1.
-  this->processes_per_dimension_[1] = 1;
-}
 
 Matrix::Matrix(MatrixConfiguration config)
     : pde_solver::BaseMatrix(config.n_cols, config.n_rows) {
   this->matrix_config_ = config;
-  this->halo_size_ = 1;
   this->is_initialized_ = false;
   this->processes_per_dimension_[0] = 0;
-
-  // the number of processes along the horizontal dimension should always be
-  // equal to 1.
   this->processes_per_dimension_[1] = 1;
 }
 
@@ -71,9 +57,8 @@ Matrix Matrix::CloneShell() {
   m.top_grid_border_coord_ = this->top_grid_border_coord_;
   m.cartesian_communicator_ = this->cartesian_communicator_;
   m.ConfigGpuExecution();
-  m.InitData(this->initial_inner_value_, this->initial_left_value_,
-             this->initial_right_value_, this->initial_bottom_value_,
-             this->initial_top_value_);
+  m.InitData(this->initial_inner_value_, this->left_value_, this->right_value_,
+             this->bottom_value_, this->top_value_);
   return m;
 }
 
@@ -81,64 +66,44 @@ void Matrix::InitData(float inner_value, float left_border_value,
                       float right_border_value, float bottom_border_value,
                       float top_border_value) {
   this->initial_inner_value_ = inner_value;
-  this->initial_left_value_ = left_border_value;
-  this->initial_right_value_ = right_border_value;
-  this->initial_bottom_value_ = bottom_border_value;
-  this->initial_top_value_ = top_border_value;
-  int inner_data_width = this->matrix_width_;
-  int inner_data_rows = this->partition_height_ +
-                        2; // Two extra rows to hold the top and bottom halo
+  this->left_value_ = left_border_value;
+  this->right_value_ = right_border_value;
+  this->bottom_value_ = bottom_border_value;
+  this->top_value_ = top_border_value;
+  int partition_width = this->matrix_width_;
+  int absolute_partition_height =
+      this->partition_height_ +
+      2; // Two extra rows to hold the top and bottom halo
   this->AllocateMemory();
   int row = 0;
   int col;
 
-  // Top halo initialization
-  // If the partition holds the top border of the matrix, there is no halo to
-  // init.
-  float halo_value_inner = this->IsTopBorder() ? -1 : inner_value;
-  float halo_value_left = this->IsTopBorder() ? -1 : left_border_value;
-  float halo_value_right = this->IsTopBorder() ? -1 : right_border_value;
-  this->inner_points_[0] = halo_value_left;
+  // // Top halo initialization
+  // // If the partition holds the top border of the matrix, there is no halo to
+  // // init.
+  // float halo_value_inner = this->IsTopBorder() ? -1 : inner_value;
+  // float halo_value_left = this->IsTopBorder() ? -1 : left_border_value;
+  // float halo_value_right = this->IsTopBorder() ? -1 : right_border_value;
+  // this->inner_points_[0] = halo_value_left;
 
-  for (col = 1; col < inner_data_width - 1; col++) {
-    this->inner_points_[col] = halo_value_inner;
+  if (!this->IsTopBorder())
+    for (col = 0; col < partition_width; col++) {
+      this->inner_points_[col] = inner_value;
+    }
+
+  row = absolute_partition_height - 1;
+
+  if (!this->IsBottomBorder()) {
+    for (col = 0; col < partition_width; col++) {
+      this->inner_points_[row * partition_width + col] = inner_value;
+    }
   }
-
-  this->inner_points_[inner_data_width - 1] = halo_value_right;
-  // Bottom Halo initialization
-  // If the partition holds the bottom border of the matrix, there is no halo to
-  // init.
-
-  halo_value_inner = this->IsBottomBorder() ? -1 : inner_value;
-  halo_value_left = this->IsBottomBorder() ? -1 : left_border_value;
-  halo_value_right = this->IsBottomBorder() ? -1 : right_border_value;
-
-  row = inner_data_rows - 1;
-
-  // the value on the first column of the halo will come from the left border
-  this->inner_points_[row * inner_data_width] = halo_value_left;
-
-  for (col = 1; col < inner_data_width - 1; col++) {
-    this->inner_points_[row * inner_data_width + col] = halo_value_inner;
-  }
-  // the value on the last column of the halo will come from the right border
-  this->inner_points_[inner_data_width * inner_data_rows - 1] =
-      halo_value_right;
 
   // Inner data
   for (int i = 0; i < this->partition_height_; i++) {
-    for (int j = 0; j < inner_data_width; j++) {
-      auto value = inner_value;
-      if (this->IsTopBorder() && i == 0) {
-        value = top_border_value;
-      } else if (this->IsBottomBorder() && i == (this->partition_height_ - 1)) {
-        value = bottom_border_value;
-      }
-      if (j == 0) {
-        value = left_border_value;
-      } else if (j == inner_data_width - 1) {
-        value = right_border_value;
-      }
+    for (int j = 0; j < partition_width; j++) {
+      float value = inner_value;
+
       this->SetLocal(value, i, j);
     }
   }
@@ -311,30 +276,30 @@ void Matrix::Deallocate() {
 }
 
 void Matrix::AllocateMemory() {
-  int inner_data_rows, inner_rows, total_gpu_rows, rows_per_gpu,
-      rows_to_allocate, rows_allocated, inner_rows_start_row_idx;
+  int absolute_partition_height, total_gpu_rows, rows_per_gpu, rows_to_allocate,
+      rows_allocated;
 
-  inner_data_rows = this->partition_height_ +
-                    2; // Two extra rows to hold the top and bottom halo
-  inner_rows = this->partition_height_ - 2;
-  inner_rows_start_row_idx = 2; // skip top halo and border.
-  total_gpu_rows = this->matrix_config_.GpuRows(inner_rows);
+  absolute_partition_height =
+      this->partition_height_ +
+      2; // Two extra rows to hold the top and bottom halo
+  // inner_rows = this->partition_height_ - 2;
+  total_gpu_rows = this->matrix_config_.GpuRows(partition_height_ - 2);
 
   // Does not include halo rows.
   rows_per_gpu =
       floor(((float)total_gpu_rows) / this->matrix_config_.gpu_number);
   rows_allocated = 0;
 
-  CUDA_CHECK_RETURN(
-      cudaMallocHost(&(this->inner_points_),
-                     inner_data_rows * this->matrix_width_ * sizeof(float)));
+  CUDA_CHECK_RETURN(cudaMallocHost(&(this->inner_points_),
+                                   absolute_partition_height *
+                                       this->matrix_width_ * sizeof(float)));
 
   // convenient reference to the top halo.
   this->top_halo_ = &this->inner_points_[0];
 
   // convenient reference to the bottom halo
-  this->bottom_halo_ =
-      &this->inner_points_[(inner_data_rows - 1) * this->matrix_width_];
+  this->bottom_halo_ = &this->inner_points_[(absolute_partition_height - 1) *
+                                            this->matrix_width_];
 
   // printf("Allocating GPU data...\n~Rows per GPU:%d\nTotal rows to be
   // processed "
@@ -351,12 +316,14 @@ void Matrix::AllocateMemory() {
     // printf("Allocating rows on GPU %d. Rows to allocate: %d\n",
     //        gpu_execution_plan.gpu_id, rows_to_allocate);
     // left and right border are excluded.
-    gpu_execution_plan.SetGpuDataWidth(this->matrix_width_ - 2);
+    gpu_execution_plan.SetGpuDataWidth(this->matrix_width_);
     gpu_execution_plan.SetGpuDataHeight(rows_per_gpu);
     cudaSetDevice(gpu_execution_plan.gpu_id);
 
     GpuReductionOperation op;
     op.gpu_id = i;
+
+    // Allovate the vector that will hold the differences
     CUDA_CHECK_RETURN(cudaMalloc(
         &(op.d_vector_to_reduce),
         gpu_execution_plan.GetGpuCalculatedRegionHeight() *
@@ -381,8 +348,7 @@ void Matrix::AllocateMemory() {
     this->inner_data_reduction_plans_.push_back(op);
 
     gpu_execution_plan.SetGpuCalculationStartRow(
-        inner_rows + inner_rows_start_row_idx -
-        (total_gpu_rows - rows_allocated));
+        partition_height_ - (total_gpu_rows - rows_allocated) - 1);
     rows_allocated += rows_per_gpu;
 
     // printf("Allocated rows on GPU %d. Total allocated rows: %d\n",
@@ -606,20 +572,17 @@ float Matrix::LocalSweep(Matrix new_matrix, ExecutionStats *execution_stats) {
     cudaSetDevice(stream.gpu_id);
 
     // move top halo to the gpu data
-    cudaMemcpyAsync(stream.d_data + 1, stream.h_d_data_mirror + 1,
-                    stream.GetGpuCalculatedRegionWidth() * sizeof(float),
+    cudaMemcpyAsync(stream.d_data, stream.h_d_data_mirror,
+                    stream.GetGpuDataWidth() * sizeof(float),
                     cudaMemcpyHostToDevice, stream.stream);
 
     // move bottom halo to the gpu data
-    cudaMemcpyAsync(stream.d_data +
-                        stream.GetGpuDataWidth() *
-                            (stream.GetGpuCalculatedRegionHeight() + 1) +
-                        1,
+    cudaMemcpyAsync(stream.d_data + stream.GetGpuDataWidth() *
+                                        (stream.GetGpuDataHeight() - 1),
                     stream.h_d_data_mirror +
                         stream.GetGpuDataWidth() *
-                            (stream.GetGpuCalculatedRegionHeight() + 1) +
-                        1,
-                    stream.GetGpuCalculatedRegionWidth() * sizeof(float),
+                            (stream.GetGpuDataHeight() - 1),
+                    stream.GetGpuDataWidth() * sizeof(float),
                     cudaMemcpyHostToDevice, stream.stream);
   }
   for (int i = 0; i < this->matrix_config_.gpu_number; i++) {
@@ -650,19 +613,20 @@ float Matrix::LocalSweep(Matrix new_matrix, ExecutionStats *execution_stats) {
 
 #pragma omp section
     {
-      if (!this->IsTopBorder()) {
+      bool is_top_border = this->IsTopBorder();
 #pragma omp parallel for reduction(max : current_max_difference_)
-        for (int i = 1; i < this->matrix_width_ - 1; i++) {
-          new_value = (this->GetLocal(0, i - 1) + this->GetLocal(0, i + 1) +
-                       this->GetLocal(1, i) + this->top_halo_[i]) /
-                      4;
-          diff = fabs(new_value - this->GetLocal(0, i));
-          if (diff > current_max_difference_) {
-            current_max_difference_ = diff;
-          }
-          new_matrix.SetLocal(new_value, 0, i);
-        }
+      for (int i = 0; i < this->matrix_width_; i++) {
 
+        new_value = (this->GetLocal(0, i - 1) + this->GetLocal(0, i + 1) +
+                     this->GetLocal(1, i) + this->GetLocal(-1, i)) /
+                    4;
+        diff = fabs(new_value - this->GetLocal(0, i));
+        if (diff > current_max_difference_) {
+          current_max_difference_ = diff;
+        }
+        new_matrix.SetLocal(new_value, 0, i);
+      }
+      if (!this->IsTopBorder()) {
         auto neighbour_top =
             this->GetNeighbour(PartitionNeighbourType::TOP_NEIGHBOUR);
         MPI_Isend(&new_matrix.inner_points_[this->matrix_width_],
@@ -684,23 +648,23 @@ float Matrix::LocalSweep(Matrix new_matrix, ExecutionStats *execution_stats) {
 
 #pragma omp section
     {
-      if (!this->IsBottomBorder()) {
-        int bottom_border_row = this->partition_height_ - 1;
+
+      int bottom_border_row = this->partition_height_ - 1;
 #pragma omp parallel for firstprivate(bottom_border_row)                       \
     reduction(max                                                              \
               : current_max_difference_)
-        for (int i = 1; i < this->matrix_width_ - 1; i++) {
-          new_value = (this->GetLocal(bottom_border_row, i - 1) +
-                       this->GetLocal(bottom_border_row, i + 1) +
-                       this->GetLocal(bottom_border_row - 1, i) +
-                       this->bottom_halo_[i]) /
-                      4;
-          if (diff > current_max_difference_) {
-            current_max_difference_ = diff;
-          }
-          new_matrix.SetLocal(new_value, bottom_border_row, i);
+      for (int i = 0; i < this->matrix_width_; i++) {
+        new_value = (this->GetLocal(bottom_border_row, i - 1) +
+                     this->GetLocal(bottom_border_row, i + 1) +
+                     this->GetLocal(bottom_border_row - 1, i) +
+                     this->GetLocal(bottom_border_row + 1, i)) /
+                    4;
+        if (diff > current_max_difference_) {
+          current_max_difference_ = diff;
         }
-
+        new_matrix.SetLocal(new_value, bottom_border_row, i);
+      }
+      if (!this->IsBottomBorder()) {
         auto neighbour_bottom =
             this->GetNeighbour(PartitionNeighbourType::BOTTOM_NEIGHBOUR);
         MPI_Isend(&new_matrix.inner_points_[this->partition_height_ *
@@ -733,11 +697,10 @@ float Matrix::LocalSweep(Matrix new_matrix, ExecutionStats *execution_stats) {
   auto cpu_adjacent_stream = this->GetCpuAdjacentInnerDataGpuPlan();
 #pragma omp parallel reduction(max : current_max_difference_)
   {
-    int i, j;
-#pragma omp for collapse(2) private(i, j, diff, new_value)
-    for (i = 1; i < cpu_adjacent_stream.GetRelativeGpuCalculationStartRow();
+#pragma omp for collapse(2) private(diff, new_value)
+    for (int i = 0; i < cpu_adjacent_stream.GetRelativeGpuCalculationStartRow();
          i++)
-      for (j = 1; j < this->matrix_width_ - 1; j++) {
+      for (int j = 0; j < this->matrix_width_; j++) {
         new_value = (this->GetLocal(i - 1, j) + this->GetLocal(i + 1, j) +
                      this->GetLocal(i, j - 1) + this->GetLocal(i, j + 1)) /
                     4;
@@ -750,10 +713,6 @@ float Matrix::LocalSweep(Matrix new_matrix, ExecutionStats *execution_stats) {
   }
 
   execution_stats->total_inner_points_time += (MPI_Wtime() - inner_points_time);
-
-  auto idle_start = MPI_Wtime();
-  MPI_Waitall(4, requests, MPI_STATUSES_IGNORE);
-  execution_stats->total_idle_comm_time += (MPI_Wtime() - idle_start);
 
   auto transfer_to_host_start = MPI_Wtime();
   for (int i = 0; i < this->matrix_config_.gpu_number; i++) {
@@ -783,8 +742,12 @@ float Matrix::LocalSweep(Matrix new_matrix, ExecutionStats *execution_stats) {
       this->current_max_difference_ = reduction_operation.h_reduction_result[0];
     }
   }
+  auto idle_start = MPI_Wtime();
+  MPI_Waitall(4, requests, MPI_STATUSES_IGNORE);
+  execution_stats->total_idle_comm_time += (MPI_Wtime() - idle_start);
   execution_stats->total_sweep_time += (MPI_Wtime() - sweep_start);
   execution_stats->n_sweeps += 1;
+
   return this->current_max_difference_;
 }
 
@@ -808,7 +771,8 @@ void checkLastError() {
 }
 void Matrix::ExecuteGpuWithConcurrentCopy(Matrix new_matrix,
                                           GpuExecution &gpu_execution_plan) {
-
+  // printf("GPU plan on process %d\n", this->proc_id_);
+  // gpu_execution_plan.Print();
   GpuReductionOperation &reduction_operation =
       this->GetInnerReductionOperation(gpu_execution_plan.gpu_id);
   GpuExecution &new_matrix_stream =
@@ -818,9 +782,6 @@ void Matrix::ExecuteGpuWithConcurrentCopy(Matrix new_matrix,
                   gpu_execution_plan.GetGpuBlockSizeY());
   dim3 grid_size(gpu_execution_plan.GetGpuGridSizeX(),
                  gpu_execution_plan.GetGpuGridSizeY());
-
-  float *t = new float[gpu_execution_plan.GetGpuDataHeight() *
-                       gpu_execution_plan.GetGpuDataWidth()];
 
   CUDA_CHECK_RETURN(cudaSetDevice(gpu_execution_plan.gpu_id));
 
@@ -848,8 +809,32 @@ void Matrix::ExecuteGpuWithConcurrentCopy(Matrix new_matrix,
                      reduction_operation.d_vector_to_reduce,
                      gpu_execution_plan.GetGpuCalculatedRegionWidth(),
                      gpu_execution_plan.GetGpuCalculatedRegionHeight(),
-                     shared_mem_calc_width, shared_mem_calc_height, block_size,
-                     grid_size, shared_mem_size, gpu_execution_plan.stream);
+                     shared_mem_calc_width, shared_mem_calc_height,
+                     gpu_execution_plan.GetRelativeGpuCalculationStartRow(),
+                     this->IsTopBorder(), this->IsBottomBorder(),
+                     this->partition_height_, block_size, grid_size,
+                     shared_mem_size, gpu_execution_plan.stream);
+  // float *t = new float[reduction_operation.vector_to_reduce_length];
+  // CUDA_CHECK_RETURN(cudaMemcpyAsync(
+  //     t, reduction_operation.d_vector_to_reduce,
+  //     reduction_operation.vector_to_reduce_length * sizeof(float),
+  //     cudaMemcpyDeviceToHost, gpu_execution_plan.stream));
+
+  // CUDA_CHECK_RETURN(cudaStreamSynchronize(gpu_execution_plan.stream));
+  // printf("\nVector to reduce\n");
+  // for (int i = 0; i < gpu_execution_plan.GetGpuCalculatedRegionHeight(); i++)
+  // {
+  //   for (int j = 0; j < gpu_execution_plan.GetGpuCalculatedRegionWidth();
+  //   j++) {
+  //     char *format = "%6.2f ";
+
+  //     if (j == gpu_execution_plan.GetGpuCalculatedRegionWidth() - 1) {
+  //       format = "%6.2f \n";
+  //     }
+  //     printf(format,
+  //            t[i * gpu_execution_plan.GetGpuCalculatedRegionWidth() + j]);
+  //   }
+  // }
 
   CUDA_CHECK_RETURN(
       cudaEventRecord(kernel_computation_complete, gpu_execution_plan.stream));
@@ -863,7 +848,8 @@ void Matrix::ExecuteGpuWithConcurrentCopy(Matrix new_matrix,
       reduction_operation.h_reduction_result,
       reduction_operation.d_reduction_result, sizeof(float),
       cudaMemcpyDeviceToHost, gpu_execution_plan.auxilary_calculation_stream));
-  int transfer_start_idx = gpu_execution_plan.GetGpuDataWidth() + 1;
+
+  int transfer_start_idx = gpu_execution_plan.GetGpuDataWidth();
 
   // move top border to the host data. Top halo of the GPU data will be
   // skipped. Left and right halo must be skipped.
@@ -878,8 +864,7 @@ void Matrix::ExecuteGpuWithConcurrentCopy(Matrix new_matrix,
   CUDA_CHECK_RETURN(cudaStreamWaitEvent(gpu_execution_plan.auxilary_copy_stream,
                                         kernel_computation_complete, 0));
   transfer_start_idx = (gpu_execution_plan.GetGpuDataWidth() *
-                        gpu_execution_plan.GetGpuCalculatedRegionHeight()) +
-                       1;
+                        gpu_execution_plan.GetGpuCalculatedRegionHeight());
   CUDA_CHECK_RETURN(cudaMemcpyAsync(
       new_matrix_stream.h_d_data_mirror + transfer_start_idx,
       new_matrix_stream.d_data + transfer_start_idx,
@@ -902,9 +887,28 @@ Matrix::GetNeighbour(PartitionNeighbourType neighbour_type) {
 }
 
 const float Matrix::GetLocal(int partition_row, int partition_col) {
-  if (partition_col < 0 || partition_col > this->matrix_width_ - 1 ||
-      partition_row < 0 || partition_row > this->partition_height_ - 1) {
-    throw new std::out_of_range("Index is out of range for the partition");
+  if (partition_col < 0) {
+    return this->left_value_;
+  }
+
+  if (partition_col > this->matrix_width_ - 1) {
+    return right_value_;
+  }
+
+  if (partition_row < 0) {
+    if (this->IsTopBorder()) {
+      return top_value_;
+    } else {
+      return top_halo_[partition_col];
+    }
+  }
+
+  if (partition_row > this->partition_height_ - 1) {
+    if (this->IsBottomBorder()) {
+      return bottom_value_;
+    } else {
+      return bottom_halo_[partition_col];
+    }
   }
 
   int row_offset = (partition_row + 1) * this->matrix_width_;
@@ -912,8 +916,8 @@ const float Matrix::GetLocal(int partition_row, int partition_col) {
 }
 
 void Matrix::SetLocal(float value, int row, int col) {
-  // offset the row by one because the first row of inner data will hold the top
-  // halo.
+  // offset the row by one because the first row of inner data will hold the
+  // top halo.
   this->inner_points_[(row + 1) * this->matrix_width_ + col] = value;
 }
 
@@ -1000,6 +1004,10 @@ void Matrix::ShowMatrix() {
              this->partition_height_ * this->matrix_width_, MPI_FLOAT, matrix,
              this->partition_height_ * this->matrix_width_, MPI_FLOAT, 0,
              this->GetCartesianCommunicator());
+  if (this->proc_id_ != 0) {
+    return;
+  }
+
   printf("\n");
   for (int i = 0; i < this->matrix_height_; i++) {
     for (int j = 0; j < this->matrix_width_; j++) {

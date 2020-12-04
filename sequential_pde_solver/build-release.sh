@@ -3,8 +3,8 @@
 rm -rf build \
 && mkdir build \
 && cd build \
-&& cmake -G "Unix Makefiles" .. \
-&& make \
+&& cmake -DCMAKE_BUILD_TYPE=Release -G "Unix Makefiles" .. \
+&& make -n \
 && cd ..
 
 

@@ -2,15 +2,15 @@
 
 #SBATCH --export=NONE
 #SBATCH --partition=gpu2080
-#SBATCH --nodes=8
+#SBATCH --nodes=4
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=24
 #SBATCH --gres=gpu:4
-#SBATCH --time=15:00:00
+#SBATCH --time=00:20:00
 #SBATCH --exclusive
-#SBATCH --job-name=custom-solver
-#SBATCH --outpu=/scratch/tmp/e_zhup01/custom-impl-measurements/output_muesli.txt
-#SBATCH --error=/scratch/tmp/e_zhup01/custom-impl-measurements/error_muesli.txt
+#SBATCH --job-name=custom-solver-4nodes
+#SBATCH --outpu=/scratch/tmp/e_zhup01/custom-impl-measurements/output_test.txt
+#SBATCH --error=/scratch/tmp/e_zhup01/custom-impl-measurements/error_test.txt
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=endizhupani@uni-muenster.de
 
@@ -40,15 +40,5 @@ export I_MPI_FABRICS=shm:tcp
 
 # parameters: #DMCols #DMRows #nGPU #nRuns #CpuPercentage
 
-for cpu_p in `seq 0.1 0.1 0.4`; do
-    for m_size in 512 1000 5000 10000; do
-        for gpu_n in 1 4; do
-        mpirun /home/e/e_zhup01/mpi_cuda_solver/build/mpi_cuda_solver.exe $m_size $gpu_n $cpu_p 10 "/scratch/tmp/e_zhup01/custom-impl-measurements/stats_n8.csv"
-        done
-    done    
-done
-
-
-#srun nvprof --analysis-metrics -o /scratch/tmp/e_zhup01/muesli-jacobi-analysis.%p.nvprof /home/e/e_zhup01/muesli4/build/jacobi -numdevices=1
-# alternativ: mpirun -np 2 <Datei>
-# alternativ: srun <Datei>
+mpirun /home/e/e_zhup01/mpi_cuda_solver/build/mpi_cuda_solver.exe 512 1 0.3 1 "/scratch/tmp/e_zhup01/custom-impl-measurements/stats_test.csv"
+					        
