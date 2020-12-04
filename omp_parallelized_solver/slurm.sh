@@ -4,26 +4,24 @@
 #SBATCH --partition=gpu2080
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
-#SBATCH --cpus-per-task=1
+#SBATCH --cpus-per-task=24
 #SBATCH --time=15:00:00
 #SBATCH --job-name=custom-solver-seq
-#SBATCH --outpu=/scratch/tmp/e_zhup01/custom-impl-measurements/output_sequential.txt
-#SBATCH --error=/scratch/tmp/e_zhup01/custom-impl-measurements/error_sequential.txt
+#SBATCH --outpu=/scratch/tmp/e_zhup01/custom-impl-measurements/output_omp.txt
+#SBATCH --error=/scratch/tmp/e_zhup01/custom-impl-measurements/error_omp.txt
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=endizhupani@uni-muenster.de
 
 module load intelcuda/2019a
 module load CMake/3.15.3
 
-
-
-cd /home/e/e_zhup01/sequential_pde_solver
-
+cd /home/e/e_zhup01/omp_parallelized_solver
+export OMP_NUM_THREADS=24
 ./build-release.sh
 
 
 for m_size in 512 1000 5000 10000; do
-    srun /home/e/e_zhup01/sequential_pde_solver/build/sequential_pde_solver.exe $m_size 5 "/scratch/tmp/e_zhup01/custom-impl-measurements/stats_seq.csv"
+    srun /home/e/e_zhup01/omp_parallelized_solver/build/omp_parallelized_solver.exe $m_size 5 "/scratch/tmp/e_zhup01/custom-impl-measurements/stats_omp.csv"
 done    
 
 
