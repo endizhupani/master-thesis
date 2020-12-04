@@ -9,7 +9,7 @@
 
 using namespace std;
 #define EPSILON 0.01
-#define MAX_ITER 1
+#define MAX_ITER 2500
 
 int getChunkSize(int arrayCount, int numElPerLine);
 
@@ -19,9 +19,9 @@ int run(int run_number, int argc, char *argv[]) {
   char *stats_output = nullptr;
 
   if (argc < 6) {
-    m_size = 50;
+    m_size = 1000;
     device_count = 1;
-    cpu_perc = 0.1;
+    cpu_perc = 0.2;
   } else {
     device_count = atoi(argv[2]);
     m_size = atoi(argv[1]);
@@ -33,7 +33,7 @@ int run(int run_number, int argc, char *argv[]) {
   MatrixConfiguration conf = {device_count, m_size, m_size, cpu_perc};
   ExecutionStats stats;
   stats.id = conf.GetConfId();
-  stats.total_jacobi_time = 0;
+
   stats.total_border_calc_time = 0;
   stats.total_inner_points_time = 0;
   stats.total_idle_comm_time = 0;
@@ -46,15 +46,17 @@ int run(int run_number, int argc, char *argv[]) {
   stats.n_sweeps = 0;
   printf("Run number: %d\n", run_number);
   printf("Configuration:%s\n", conf.GetConfId().c_str());
-  double start = MPI_Wtime();
+
   pde_solver::Matrix m(conf);
   // old matrix
   m.Init(75, 100, 100, 0, 100, argc, argv);
+  // m.ShowMatrix();
   // new matrix. Stores the result of the Jacobi sweep.
   pde_solver::Matrix new_m = m.CloneShell();
   int num_iter = 0;
   float global_diff = 10;
   int process_id = GetProcessId();
+  double start = MPI_Wtime();
   while (global_diff > EPSILON && num_iter < MAX_ITER) {
     float diff = m.LocalSweep(new_m, &stats);
     // printf("localdiff on proc %d: %f\n", process_id, diff);
@@ -69,7 +71,7 @@ int run(int run_number, int argc, char *argv[]) {
     // m.ShowMatrix();
   }
   stats.total_jacobi_time = MPI_Wtime() - start;
-
+  // m.ShowMatrix();
   if (process_id == 0) {
     if (stats_output) {
       if (run_number == 1) {

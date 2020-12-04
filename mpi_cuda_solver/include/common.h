@@ -86,6 +86,7 @@ public:
   int n_rows;
   int n_cols;
   double cpu_perc;
+  float left_value_, right_value_, top_value_, bottom_value_;
 
   /**
    * @brief Determines the number of rows our the total that should be processed
@@ -131,6 +132,11 @@ public:
 
 struct GpuExecution {
 #define DEFAULT_BLOCK_DIM 16
+#define VERTICAL_HALO_SIZE 1
+#define HORIZONTAL_HALO_SIZE 0
+#define VERTICAL_SMEM_HALO_SIZE 1
+#define HORIZONTALSMEM_HALO_SIZE 1
+
 private:
   int gpu_block_size_x = 0;
   int gpu_block_size_y = 0;
@@ -193,8 +199,8 @@ public:
   }
 
   /**
-   * @brief Sets the row of the full partition data object (including the top
-   * and bottom halos of the partition data) where the GPU calculation starts
+   * @brief Sets the local row of the partition where the GPU calculation
+   * starts. 0 should be the first row of the partition data.
    *
    * @param value
    */
@@ -202,22 +208,22 @@ public:
 
   /**
    * @brief Gets the first row of the region that is calculated by the GPU.
-   * Skips any halo rows that might be in the GPU data. The row index is on the
-   * full partition data with 0 being the first halo row
+   * Takes into account the halo rows
    *
    * @return const int
    */
-  const int GetAbsoluteGpuCalculationStartRow() { return gpu_region_start; }
+  const int GetAbsoluteGpuCalculationStartRow() {
+    return gpu_region_start + VERTICAL_HALO_SIZE;
+  }
 
   /**
    * @brief Gets the first row of the region that is calculated by the GPU.
    * Skips any halo rows that might be in the GPU data. The row index is on the
-   * partition data with 0 being the first row of the partition. The halo rows
-   * are skipped
+   * partition data with 0 being the first row of the partition.
    *
    * @return const int
    */
-  const int GetRelativeGpuCalculationStartRow() { return gpu_region_start - 1; }
+  const int GetRelativeGpuCalculationStartRow() { return gpu_region_start; }
 
   /**
    * @brief returns the value of the first row that should be copied to the GPU.
@@ -227,7 +233,7 @@ public:
    *
    * @return const int
    */
-  const int GetGpuDataStartRow() { return gpu_region_start - 1; }
+  const int GetGpuDataStartRow() { return gpu_region_start; }
 
   void SetDeviceProperties(cudaDeviceProp deviceProp) {
     concurrentKernelCopy = deviceProp.deviceOverlap;
@@ -273,11 +279,12 @@ public:
   int GetGpuCalculatedRegionHeight() { return gpu_data_height; }
 
   /**
-   * @brief Returns the full height of the data section residing on the GPU
+   * @brief Returns the full height of the data section residing on the GPU.
+   * Includes halo cells
    *
    * @return int
    */
-  int GetGpuDataHeight() { return gpu_data_height + 2; }
+  int GetGpuDataHeight() { return gpu_data_height + 2 * VERTICAL_HALO_SIZE; }
 
   /**
    * @brief Returns the width of the region that is calculated by the GPU. This
@@ -289,11 +296,12 @@ public:
   int GetGpuCalculatedRegionWidth() { return gpu_data_width; }
 
   /**
-   * @brief Returnds the full width of the data stored in the GPU.
+   * @brief Returnds the full width of the data stored in the GPU. Includes halo
+   * cells
    *
    * @return int
    */
-  int GetGpuDataWidth() { return gpu_data_width + 2; }
+  int GetGpuDataWidth() { return gpu_data_width + 2 * HORIZONTAL_HALO_SIZE; }
 
   int GetGpuBlockSizeY() { return gpu_block_size_y; }
 

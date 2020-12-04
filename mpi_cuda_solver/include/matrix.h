@@ -101,10 +101,10 @@ private:
   float *top_halo_;
 
   float initial_inner_value_;
-  float initial_left_value_;
-  float initial_right_value_;
-  float initial_top_value_;
-  float initial_bottom_value_;
+  float left_value_;
+  float right_value_;
+  float top_value_;
+  float bottom_value_;
 
   float *full_matrix_;
 
@@ -248,16 +248,6 @@ public:
   GpuReductionOperation &GetInnerReductionOperation(int gpu_id);
   const GpuExecution GetLeftBorderStream();
   const GpuExecution GetRightBorderStream();
-
-  /**
-   * @brief Construct a new Matrix object
-   *
-   * @param halo_size size of the halo around partitions this is in number of
-   * columns or rows.
-   * @param width width of the global matrix
-   * @param height height of the global matrix
-   */
-  Matrix(int halo_size, int width, int height);
 
   /**
    * @brief Construct a new Matrix object

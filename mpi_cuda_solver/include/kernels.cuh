@@ -26,10 +26,14 @@
 #include "common.h"
 __global__ void jacobiKernel(float *in, float *out, float *diff,
                              int gpu_data_width, int gpu_data_height,
-                             int smem_width, int smem_height);
+                             int smem_width, int smem_height,
+                             int gpu_calc_start_r_idx, bool is_top_process,
+                             bool is_bottom_process, int partition_height);
 
 void LaunchJacobiKernel(float *in, float *out, float *diff, int gpu_data_width,
                         int gpu_data_height, int smem_width, int smem_height,
+                        int gpu_calc_start_r_idx, bool is_top_process,
+                        bool is_bottom_process, int partition_height,
                         dim3 block_size, dim3 grid_size, size_t shared_mem_size,
                         cudaStream_t stream);
 
