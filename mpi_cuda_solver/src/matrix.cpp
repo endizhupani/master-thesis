@@ -751,10 +751,6 @@ float Matrix::LocalSweep(Matrix new_matrix, ExecutionStats *execution_stats) {
 
   execution_stats->total_inner_points_time += (MPI_Wtime() - inner_points_time);
 
-  auto idle_start = MPI_Wtime();
-  MPI_Waitall(4, requests, MPI_STATUSES_IGNORE);
-  execution_stats->total_idle_comm_time += (MPI_Wtime() - idle_start);
-
   auto transfer_to_host_start = MPI_Wtime();
   for (int i = 0; i < this->matrix_config_.gpu_number; i++) {
     GpuExecution &execution_plan = this->GetInnerDataPlanForGpuId(i);
@@ -776,15 +772,19 @@ float Matrix::LocalSweep(Matrix new_matrix, ExecutionStats *execution_stats) {
 
     GpuReductionOperation &reduction_operation =
         this->GetInnerReductionOperation(i);
-    // printf("Reduction on the gpu on process %d: %f\n", this->proc_id_,
-    //        reduction_operation.h_reduction_result[0]);
+    printf("Reduction on the gpu on process %d: %f\n", this->proc_id_,
+           reduction_operation.h_reduction_result[0]);
     if (reduction_operation.h_reduction_result[0] >
         this->current_max_difference_) {
       this->current_max_difference_ = reduction_operation.h_reduction_result[0];
     }
   }
+  auto idle_start = MPI_Wtime();
+  MPI_Waitall(4, requests, MPI_STATUSES_IGNORE);
+  execution_stats->total_idle_comm_time += (MPI_Wtime() - idle_start);
   execution_stats->total_sweep_time += (MPI_Wtime() - sweep_start);
   execution_stats->n_sweeps += 1;
+
   return this->current_max_difference_;
 }
 
@@ -808,7 +808,8 @@ void checkLastError() {
 }
 void Matrix::ExecuteGpuWithConcurrentCopy(Matrix new_matrix,
                                           GpuExecution &gpu_execution_plan) {
-
+  printf("GPU plan on process %d\n", this->proc_id_);
+  gpu_execution_plan.Print();
   GpuReductionOperation &reduction_operation =
       this->GetInnerReductionOperation(gpu_execution_plan.gpu_id);
   GpuExecution &new_matrix_stream =

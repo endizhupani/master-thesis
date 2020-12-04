@@ -184,6 +184,14 @@ public:
 
   bool is_contiguous_on_host;
 
+  void Print() {
+    printf("gpu_id: %d\ngpu_block_size_x: %d\ngpu_block_size_y: "
+           "%d\ngpu_grid_size_x: %d\ngpu_grid_size_y: %d\ngpu_data_width: "
+           "%d\ngpu_data_height: %d\ngpu_region_start: %d\n",
+           gpu_id, gpu_block_size_x, gpu_block_size_y, gpu_grid_size_x,
+           gpu_grid_size_y, gpu_data_width, gpu_data_height, gpu_region_start);
+  }
+
   /**
    * @brief Sets the row of the full partition data object (including the top
    * and bottom halos of the partition data) where the GPU calculation starts

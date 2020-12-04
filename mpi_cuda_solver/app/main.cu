@@ -9,7 +9,7 @@
 
 using namespace std;
 #define EPSILON 0.01
-#define MAX_ITER 5000
+#define MAX_ITER 1
 
 int getChunkSize(int arrayCount, int numElPerLine);
 
