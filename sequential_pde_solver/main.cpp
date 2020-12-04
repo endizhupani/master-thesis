@@ -81,7 +81,7 @@ double run_matrix_as_array(int matrix_size) {
 }
 
 int main(int argc, char *argv[]) {
-  int m_size = 512;
+  int m_size = 1000;
   int n_runs = 1;
   char *file;
   if (argc < 4) {

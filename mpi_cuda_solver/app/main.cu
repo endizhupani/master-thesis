@@ -19,9 +19,9 @@ int run(int run_number, int argc, char *argv[]) {
   char *stats_output = nullptr;
 
   if (argc < 6) {
-    m_size = 1000;
+    m_size = 5000;
     device_count = 1;
-    cpu_perc = 0.2;
+    cpu_perc = 0.1;
   } else {
     device_count = atoi(argv[2]);
     m_size = atoi(argv[1]);

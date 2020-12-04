@@ -283,7 +283,7 @@ void Matrix::AllocateMemory() {
       this->partition_height_ +
       2; // Two extra rows to hold the top and bottom halo
   // inner_rows = this->partition_height_ - 2;
-  total_gpu_rows = this->matrix_config_.GpuRows(partition_height_);
+  total_gpu_rows = this->matrix_config_.GpuRows(partition_height_ - 2);
 
   // Does not include halo rows.
   rows_per_gpu =
@@ -348,7 +348,7 @@ void Matrix::AllocateMemory() {
     this->inner_data_reduction_plans_.push_back(op);
 
     gpu_execution_plan.SetGpuCalculationStartRow(
-        partition_height_ - (total_gpu_rows - rows_allocated));
+        partition_height_ - (total_gpu_rows - rows_allocated) - 1);
     rows_allocated += rows_per_gpu;
 
     // printf("Allocated rows on GPU %d. Total allocated rows: %d\n",

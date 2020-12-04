@@ -9,8 +9,8 @@
 #SBATCH --time=15:00:00
 #SBATCH --exclusive
 #SBATCH --job-name=custom-solver-8nodes
-#SBATCH --outpu=/scratch/tmp/e_zhup01/custom-impl-measurements/output_muesli.txt
-#SBATCH --error=/scratch/tmp/e_zhup01/custom-impl-measurements/error_muesli.txt
+#SBATCH --outpu=/scratch/tmp/e_zhup01/custom-impl-measurements/output_8nodes.txt
+#SBATCH --error=/scratch/tmp/e_zhup01/custom-impl-measurements/error_8nodes.txt
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=endizhupani@uni-muenster.de
 
@@ -43,7 +43,7 @@ export I_MPI_FABRICS=shm:tcp
 for cpu_p in `seq 0.1 0.1 0.3`; do
     for m_size in 512 1000 5000 10000; do
         for gpu_n in 1 4; do
-        mpirun /home/e/e_zhup01/mpi_cuda_solver/build/mpi_cuda_solver.exe $m_size $gpu_n $cpu_p 5 "/scratch/tmp/e_zhup01/custom-impl-measurements/stats_n8_try2.csv"
+        mpirun /home/e/e_zhup01/mpi_cuda_solver/build/mpi_cuda_solver.exe $m_size $gpu_n $cpu_p 5 "/scratch/tmp/e_zhup01/custom-impl-measurements/stats_n8_try3.csv"
         done
     done    
 done

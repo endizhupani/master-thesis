@@ -16,7 +16,7 @@ module load intelcuda/2019a
 module load CMake/3.15.3
 
 cd /home/e/e_zhup01/omp_parallelized_solver
-
+export OMP_NUM_THREADS=24
 ./build-release.sh
 
 

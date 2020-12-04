@@ -10,7 +10,7 @@
 
 int getChunkSize(int arrayCount, int numElPerLine);
 double run(int size_per_dim) {
-  double start = omp_get_wtime();
+
   size_t cache_line_size_b = CacheLineSize();
   int dp_per_line = cache_line_size_b / sizeof(float);
   int max_threads = omp_get_max_threads();
@@ -28,26 +28,12 @@ double run(int size_per_dim) {
 #pragma omp parallel for schedule(                                             \
     static, getChunkSize(size_per_dim *size_per_dim, dp_per_line))             \
     firstprivate(dp_per_line, size_per_dim)
-  for (int i = 0; i < size_per_dim; i++) {
-    u[i * size_per_dim] = u[i * size_per_dim + (size_per_dim - 1)] = u[i] =
-        w[i * size_per_dim] = w[i * size_per_dim + (size_per_dim - 1)] = w[i] =
-            100;
-    u[(size_per_dim - 1) * size_per_dim + i] =
-        w[(size_per_dim - 1) * size_per_dim + i] = 0;
-  }
-
-#pragma omp parallel for schedule(                                             \
-    static, getChunkSize(size_per_dim *size_per_dim, dp_per_line))             \
-    firstprivate(dp_per_line, size_per_dim)
-  for (int i = size_per_dim; i < (size_per_dim * size_per_dim) - size_per_dim;
-       i++) {
-    if (i % size_per_dim == 0 || (i - (size_per_dim - 1)) % size_per_dim == 0) {
-      continue;
-    }
+  for (int i = 0; i < (size_per_dim * size_per_dim); i++) {
     u[i] = 75;
   }
 
   int num_iter = 0;
+  double start = omp_get_wtime();
   while (globalDiff > EPSILON && num_iter < MAX_ITER) {
     globalDiff = 0.0;
 
@@ -56,15 +42,36 @@ double run(int size_per_dim) {
                                                               : globalDiff)    \
     schedule(static, getChunkSize(size_per_dim *size_per_dim, dp_per_line))
 
-    for (int i = size_per_dim + 1;
-         i < (size_per_dim * size_per_dim) - size_per_dim - 1; i++) {
-      if (i % size_per_dim == 0 ||
-          (i - (size_per_dim - 1)) % size_per_dim == 0) {
-        continue;
+    for (int i = 0; i < (size_per_dim * size_per_dim); i++) {
+      int row, col;
+      row = i / size_per_dim;
+      col = i % size_per_dim;
+      float top, bottom, right, left;
+      if (row == 0) {
+        top = 100;
+      } else {
+        top = u[i - size_per_dim];
       }
-      float previous = u[i];
-      w[i] =
-          (u[i - 1] + u[i + 1] + u[i - size_per_dim] + u[i + size_per_dim]) / 4;
+      if (row == size_per_dim - 1) {
+        bottom = 0;
+      } else {
+        bottom = u[i + size_per_dim];
+      }
+
+      if (col == 0) {
+        left = 100;
+      } else {
+        left = u[i - 1];
+      }
+      float previous = u[i]; // place here because chances are it will be
+                             // fetched from the cache
+      if (col == size_per_dim - 1) {
+        right = 100;
+      } else {
+        right = u[i + 1];
+      }
+
+      w[i] = (top + bottom + right + left) / 4;
 
       float currentDifference = fabs(w[i] - previous);
       if (currentDifference > globalDiff) {
@@ -79,16 +86,12 @@ double run(int size_per_dim) {
   }
 
   double end = omp_get_wtime();
-  // for (int i = 0; i < size_per_dim; i++)
-  // {
-  //     for (int j = 0; j < size_per_dim; j++)
-  //     {
-  //         printf("%6.2f ", u[i * size_per_dim + j]);
-  //     }
-  //     putchar('\n');
+  // for (int i = 0; i < size_per_dim; i++) {
+  //   for (int j = 0; j < size_per_dim; j++) {
+  //     printf("%6.2f ", u[i * size_per_dim + j]);
+  //   }
+  //   putchar('\n');
   // }
-  // delete[] u;
-  // delete[] w;
   std::cout << "Done in: " << num_iter << " iterations" << std::endl;
   free(w);
   free(u);
@@ -105,7 +108,7 @@ void report_num_threads(int level) {
 }
 
 int main(int argc, char *argv[]) {
-  int m_size = 5000;
+  int m_size = 1000;
   int n_runs = 1;
   char *file;
   if (argc < 4) {
