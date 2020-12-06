@@ -19,7 +19,7 @@ int run(int run_number, int argc, char *argv[]) {
   char *stats_output = nullptr;
 
   if (argc < 6) {
-    m_size = 5000;
+    m_size = 512;
     device_count = 1;
     cpu_perc = 0.1;
   } else {
@@ -59,10 +59,11 @@ int run(int run_number, int argc, char *argv[]) {
   double start = MPI_Wtime();
   while (global_diff > EPSILON && num_iter < MAX_ITER) {
     float diff = m.LocalSweep(new_m, &stats);
+    // printf("\n\n");
     // printf("localdiff on proc %d: %f\n", process_id, diff);
     if (num_iter % 4 == 0) {
       global_diff = m.GlobalDifference(&stats);
-      // printf("Global diff: %f\n", global_diff);
+      // printf("Global diff on iteration %d: %f\n", num_iter, global_diff);
     }
     pde_solver::Matrix tmp = m;
     m = new_m;

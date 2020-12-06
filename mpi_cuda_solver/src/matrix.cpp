@@ -317,7 +317,7 @@ void Matrix::AllocateMemory() {
     //        gpu_execution_plan.gpu_id, rows_to_allocate);
     // left and right border are excluded.
     gpu_execution_plan.SetGpuDataWidth(this->matrix_width_);
-    gpu_execution_plan.SetGpuDataHeight(rows_per_gpu);
+    gpu_execution_plan.SetGpuDataHeight(rows_to_allocate);
     cudaSetDevice(gpu_execution_plan.gpu_id);
 
     GpuReductionOperation op;
@@ -594,7 +594,6 @@ float Matrix::LocalSweep(Matrix new_matrix, ExecutionStats *execution_stats) {
   execution_stats->total_time_waiting_to_device_transfer +=
       (MPI_Wtime() - time_to_device);
   this->current_max_difference_ = 0;
-  float diff, new_value;
 
   int max_thread_num = omp_get_max_threads();
 
@@ -605,7 +604,7 @@ float Matrix::LocalSweep(Matrix new_matrix, ExecutionStats *execution_stats) {
   omp_set_nested(2);
   auto sweep_start = MPI_Wtime();
   auto border_start = MPI_Wtime();
-#pragma omp parallel sections firstprivate(diff, new_value, max_thread_num)    \
+#pragma omp parallel sections firstprivate(max_thread_num)                     \
     num_threads(std::min(max_thread_num, 2))                                   \
         reduction(max                                                          \
                   : current_max_difference_)
@@ -617,10 +616,10 @@ float Matrix::LocalSweep(Matrix new_matrix, ExecutionStats *execution_stats) {
 #pragma omp parallel for reduction(max : current_max_difference_)
       for (int i = 0; i < this->matrix_width_; i++) {
 
-        new_value = (this->GetLocal(0, i - 1) + this->GetLocal(0, i + 1) +
-                     this->GetLocal(1, i) + this->GetLocal(-1, i)) /
-                    4;
-        diff = fabs(new_value - this->GetLocal(0, i));
+        float new_value = (this->GetLocal(0, i - 1) + this->GetLocal(0, i + 1) +
+                           this->GetLocal(1, i) + this->GetLocal(-1, i)) /
+                          4;
+        float diff = fabs(new_value - this->GetLocal(0, i));
         if (diff > current_max_difference_) {
           current_max_difference_ = diff;
         }
@@ -654,11 +653,12 @@ float Matrix::LocalSweep(Matrix new_matrix, ExecutionStats *execution_stats) {
     reduction(max                                                              \
               : current_max_difference_)
       for (int i = 0; i < this->matrix_width_; i++) {
-        new_value = (this->GetLocal(bottom_border_row, i - 1) +
-                     this->GetLocal(bottom_border_row, i + 1) +
-                     this->GetLocal(bottom_border_row - 1, i) +
-                     this->GetLocal(bottom_border_row + 1, i)) /
-                    4;
+        float new_value = (this->GetLocal(bottom_border_row, i - 1) +
+                           this->GetLocal(bottom_border_row, i + 1) +
+                           this->GetLocal(bottom_border_row - 1, i) +
+                           this->GetLocal(bottom_border_row + 1, i)) /
+                          4;
+        float diff = fabs(new_value - this->GetLocal(bottom_border_row, i));
         if (diff > current_max_difference_) {
           current_max_difference_ = diff;
         }
@@ -685,7 +685,8 @@ float Matrix::LocalSweep(Matrix new_matrix, ExecutionStats *execution_stats) {
       }
     }
   }
-
+  // printf("Current max difference after borders: %f\n",
+  //        this->current_max_difference_);
   execution_stats->total_border_calc_time += (MPI_Wtime() - border_start);
   auto inner_points_time = MPI_Wtime();
   for (int i = 0; i < this->matrix_config_.gpu_number; i++) {
@@ -697,21 +698,23 @@ float Matrix::LocalSweep(Matrix new_matrix, ExecutionStats *execution_stats) {
   auto cpu_adjacent_stream = this->GetCpuAdjacentInnerDataGpuPlan();
 #pragma omp parallel reduction(max : current_max_difference_)
   {
-#pragma omp for collapse(2) private(diff, new_value)
+#pragma omp for collapse(2)
     for (int i = 0; i < cpu_adjacent_stream.GetRelativeGpuCalculationStartRow();
          i++)
       for (int j = 0; j < this->matrix_width_; j++) {
-        new_value = (this->GetLocal(i - 1, j) + this->GetLocal(i + 1, j) +
-                     this->GetLocal(i, j - 1) + this->GetLocal(i, j + 1)) /
-                    4;
-        diff = fabs(new_value - this->GetLocal(i, j));
+        float new_value =
+            (this->GetLocal(i - 1, j) + this->GetLocal(i + 1, j) +
+             this->GetLocal(i, j - 1) + this->GetLocal(i, j + 1)) /
+            4;
+        float diff = fabs(new_value - this->GetLocal(i, j));
         if (diff > current_max_difference_) {
           current_max_difference_ = diff;
         }
         new_matrix.SetLocal(new_value, i, j);
       }
   }
-
+  // printf("Current max difference after cpu inner: %f\n",
+  //        this->current_max_difference_);
   execution_stats->total_inner_points_time += (MPI_Wtime() - inner_points_time);
 
   auto transfer_to_host_start = MPI_Wtime();
@@ -735,7 +738,8 @@ float Matrix::LocalSweep(Matrix new_matrix, ExecutionStats *execution_stats) {
 
     GpuReductionOperation &reduction_operation =
         this->GetInnerReductionOperation(i);
-    // printf("Reduction on the gpu on process %d: %f\n", this->proc_id_,
+    // printf("Reduction on the gpu on process %d and device %d: %f\n",
+    //        this->proc_id_, reduction_operation.gpu_id,
     //        reduction_operation.h_reduction_result[0]);
     if (reduction_operation.h_reduction_result[0] >
         this->current_max_difference_) {
@@ -747,7 +751,7 @@ float Matrix::LocalSweep(Matrix new_matrix, ExecutionStats *execution_stats) {
   execution_stats->total_idle_comm_time += (MPI_Wtime() - idle_start);
   execution_stats->total_sweep_time += (MPI_Wtime() - sweep_start);
   execution_stats->n_sweeps += 1;
-
+  // printf("Current max difference: %f\n", this->current_max_difference_);
   return this->current_max_difference_;
 }
 
