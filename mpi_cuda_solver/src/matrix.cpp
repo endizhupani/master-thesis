@@ -696,23 +696,25 @@ float Matrix::LocalSweep(Matrix new_matrix, ExecutionStats *execution_stats) {
     }
   }
   auto cpu_adjacent_stream = this->GetCpuAdjacentInnerDataGpuPlan();
-#pragma omp parallel reduction(max : current_max_difference_)
-  {
-#pragma omp for collapse(2)
-    for (int i = 0; i < cpu_adjacent_stream.GetRelativeGpuCalculationStartRow();
-         i++)
-      for (int j = 0; j < this->matrix_width_; j++) {
-        float new_value =
-            (this->GetLocal(i - 1, j) + this->GetLocal(i + 1, j) +
-             this->GetLocal(i, j - 1) + this->GetLocal(i, j + 1)) /
-            4;
-        float diff = fabs(new_value - this->GetLocal(i, j));
-        if (diff > current_max_difference_) {
-          current_max_difference_ = diff;
-        }
-        new_matrix.SetLocal(new_value, i, j);
-      }
+
+#pragma omp parallel for reduction(max : current_max_difference_)
+  for (int i = 0;
+       i < (cpu_adjacent_stream.GetRelativeGpuCalculationStartRow() - 1) *
+               this->matrix_width_;
+       i++) {
+    int row = i / this->matrix_width_;
+    int col = i % this->matrix_width_;
+    float new_value =
+        (this->GetLocal(row - 1, col) + this->GetLocal(row + 1, col) +
+         this->GetLocal(row, col - 1) + this->GetLocal(row, col + 1)) /
+        4;
+    float diff = fabs(new_value - this->GetLocal(row, col));
+    if (diff > current_max_difference_) {
+      current_max_difference_ = diff;
+    }
+    new_matrix.SetLocal(new_value, row, col);
   }
+
   // printf("Current max difference after cpu inner: %f\n",
   //        this->current_max_difference_);
   execution_stats->total_inner_points_time += (MPI_Wtime() - inner_points_time);
@@ -753,7 +755,7 @@ float Matrix::LocalSweep(Matrix new_matrix, ExecutionStats *execution_stats) {
   execution_stats->n_sweeps += 1;
   // printf("Current max difference: %f\n", this->current_max_difference_);
   return this->current_max_difference_;
-}
+} // namespace pde_solver
 
 GpuReductionOperation &Matrix::GetInnerReductionOperation(int gpu_id) {
   for (size_t i = 0; i < this->inner_data_reduction_plans_.size(); i++) {
