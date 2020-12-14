@@ -25,9 +25,8 @@ double run(int size_per_dim) {
           sizeof(float))); // new double[size_per_dim * size_per_dim];
   float *tmp;
 
-#pragma omp parallel for schedule(                                             \
-    static, getChunkSize(size_per_dim *size_per_dim, dp_per_line))             \
-    firstprivate(dp_per_line, size_per_dim)
+#pragma omp parallel for firstprivate(dp_per_line, size_per_dim)               \
+    schedule(static, getChunkSize(size_per_dim *size_per_dim, dp_per_line))
   for (int i = 0; i < (size_per_dim * size_per_dim); i++) {
     u[i] = 75;
   }
@@ -41,7 +40,6 @@ double run(int size_per_dim) {
                                       size_per_dim) reduction(max              \
                                                               : globalDiff)    \
     schedule(static, getChunkSize(size_per_dim *size_per_dim, dp_per_line))
-
     for (int i = 0; i < (size_per_dim * size_per_dim); i++) {
       int row, col;
       row = i / size_per_dim;
