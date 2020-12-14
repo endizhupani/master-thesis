@@ -867,8 +867,8 @@ void Matrix::ExecuteGpuWithConcurrentCopy(Matrix new_matrix,
 
   // move bottom border to the host data. Left and right halo must be
   // skipped.
-  CUDA_CHECK_RETURN(cudaStreamWaitEvent(gpu_execution_plan.auxilary_copy_stream,
-                                        kernel_computation_complete, 0));
+  // CUDA_CHECK_RETURN(cudaStreamWaitEvent(gpu_execution_plan.auxilary_copy_stream,
+  //                                       kernel_computation_complete, 0));
   transfer_start_idx = (gpu_execution_plan.GetGpuDataWidth() *
                         gpu_execution_plan.GetGpuCalculatedRegionHeight());
   CUDA_CHECK_RETURN(cudaMemcpyAsync(
